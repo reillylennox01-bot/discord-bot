@@ -5,7 +5,7 @@
   "main": "src/index.js",
   "type": "module",
   "scripts": {
-    "start": "node src/index.js",
+    "start": "concurrently \"node src/index.js\" \"node src/web.js\"",
     "dev": "nodemon src/index.js",
     "deploy-commands": "node src/deploy-commands.js",
     "pm2-start": "pm2 start ecosystem.config.cjs",
@@ -14,16 +14,22 @@
     "pm2-restart": "pm2 restart discord-bot",
     "pm2-status": "pm2 status"
   },
-  "keywords": ["discord", "bot", "discord.js"],
+  "keywords": [
+    "discord",
+    "bot",
+    "discord.js"
+  ],
   "author": "",
   "license": "MIT",
   "dependencies": {
+    "@discordjs/rest": "^1.5.0",
+    "discord-api-types": "^0.37.41",
     "discord.js": "^14.13.0",
     "dotenv": "^16.4.0",
-    "@discordjs/rest": "^1.5.0",
-    "discord-api-types": "^0.37.41"
+    "express": "^5.2.1"
   },
   "devDependencies": {
-    "nodemon": "^3.0.1"
+    "nodemon": "^3.0.1",
+    "concurrently": "^8.2.0"
   }
 }
