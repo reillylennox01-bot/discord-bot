@@ -1,21 +1,79 @@
 import { getButtonRolesConfig, findButtonRole } from '../utils/buttonRoles.js';
+import { setGuildConfig, getGuildConfig } from '../utils/settings.js';
 import {
   getTicketConfig,
   addOpenTicket,
   removeOpenTicket,
   findTicketOwnerByChannel
 } from '../utils/tickets.js';
-import { getGuildConfig } from '../utils/settings.js';
 import {
   ActionRowBuilder,
   AttachmentBuilder,
   ButtonBuilder,
   ButtonStyle,
   EmbedBuilder,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle,
   PermissionFlagsBits,
   ChannelType,
   Collection
 } from 'discord.js';
+
+function parseColor(value) {
+  if (!value) return null;
+  const hex = value.replace(/^#/, '');
+  if (!/^[0-9a-f]{6}$/i.test(hex)) return null;
+  return parseInt(hex, 16);
+}
+
+function buildEmbedFromData(data) {
+  const embed = new EmbedBuilder();
+
+  if (data.title) embed.setTitle(data.title);
+  if (data.description) embed.setDescription(data.description);
+  if (data.color) {
+    const parsed = parseColor(data.color);
+    if (parsed) embed.setColor(parsed);
+  }
+  if (data.thumbnail_url) embed.setThumbnail(data.thumbnail_url);
+  if (data.image_url) embed.setImage(data.image_url);
+  if (data.footer) {
+    embed.setFooter({ text: data.footer, iconURL: data.footer_icon_url || undefined });
+  }
+  if (data.author_name) {
+    embed.setAuthor({
+      name: data.author_name,
+      iconURL: data.author_icon_url || undefined
+    });
+  }
+
+  const fields = Array.isArray(data.fields) ? data.fields : [];
+  if (fields.length > 0) {
+    embed.addFields(
+      fields
+        .filter((field) => field.name && field.value)
+        .map((field) => ({
+          name: field.name,
+          value: String(field.value),
+          inline: Boolean(field.inline)
+        }))
+    );
+  }
+
+  return embed;
+}
+
+function hasEmbeddableContent(data) {
+  return Boolean(
+    data?.title ||
+      data?.description ||
+      data?.image_url ||
+      data?.thumbnail_url ||
+      data?.author_name ||
+      (Array.isArray(data?.fields) && data.fields.some((field) => field?.name && field?.value))
+  );
+}
 
 function buildTicketChannelName(user) {
   const baseName = user.username
@@ -24,6 +82,33 @@ function buildTicketChannelName(user) {
     .replace(/^-+|-+$/g, '')
     .slice(0, 12) || 'ticket';
   return `ticket-${baseName}-${user.id.slice(-4)}`;
+}
+
+function buildSlotPickerComponents(selectedSlot = null) {
+  const firstRow = [];
+  for (let index = 1; index <= 5; index += 1) {
+    firstRow.push(
+      new ButtonBuilder()
+        .setCustomId(`sendembed_slot:${index}`)
+        .setLabel(`Slot ${index}`)
+        .setStyle(selectedSlot === index ? ButtonStyle.Success : ButtonStyle.Primary)
+    );
+  }
+
+  const secondRow = [];
+  for (let index = 6; index <= 10; index += 1) {
+    secondRow.push(
+      new ButtonBuilder()
+        .setCustomId(`sendembed_slot:${index}`)
+        .setLabel(`Slot ${index}`)
+        .setStyle(selectedSlot === index ? ButtonStyle.Success : ButtonStyle.Primary)
+    );
+  }
+
+  return [
+    new ActionRowBuilder().addComponents(...firstRow),
+    new ActionRowBuilder().addComponents(...secondRow)
+  ];
 }
 
 async function sendTranscript(channel, transcriptChannel) {
@@ -174,6 +259,253 @@ export default {
         return;
       }
 
+      if (customId.startsWith('sendembed_advanced:')) {
+        const parts = customId.split(':');
+        const slot = Number(parts[1]);
+        const channelId = parts[2];
+
+        if (!channelId) {
+          await interaction.reply({ content: 'Channel data lost. Please run /sendembed again.', ephemeral: true });
+          return;
+        }
+
+        const guildConfig = getGuildConfig(interaction.guild.id);
+        const pendingEmbeds = guildConfig.pendingEmbeds || {};
+        const channelEmbeds = pendingEmbeds[channelId]?.embeds || Array.from({ length: 10 }, () => null);
+        const currentEmbed = channelEmbeds[slot - 1] || {};
+
+        const modal = new ModalBuilder()
+          .setCustomId(`sendembed_advanced_modal:${slot}:${channelId}`)
+          .setTitle(`Edit Advanced Options - Slot ${slot}`);
+
+        const footerInput = new TextInputBuilder()
+          .setCustomId('footer')
+          .setLabel('Footer Text')
+          .setStyle(TextInputStyle.Short)
+          .setValue(currentEmbed.footer || '')
+          .setRequired(false);
+
+        const footerIconInput = new TextInputBuilder()
+          .setCustomId('footer_icon_url')
+          .setLabel('Footer Icon URL')
+          .setStyle(TextInputStyle.Short)
+          .setValue(currentEmbed.footer_icon_url || '')
+          .setRequired(false);
+
+        const authorNameInput = new TextInputBuilder()
+          .setCustomId('author_name')
+          .setLabel('Author Name')
+          .setStyle(TextInputStyle.Short)
+          .setValue(currentEmbed.author_name || '')
+          .setRequired(false);
+
+        const authorIconInput = new TextInputBuilder()
+          .setCustomId('author_icon_url')
+          .setLabel('Author Icon URL')
+          .setStyle(TextInputStyle.Short)
+          .setValue(currentEmbed.author_icon_url || '')
+          .setRequired(false);
+
+        const row1 = new ActionRowBuilder().addComponents(footerInput);
+        const row2 = new ActionRowBuilder().addComponents(footerIconInput);
+        const row3 = new ActionRowBuilder().addComponents(authorNameInput);
+        const row4 = new ActionRowBuilder().addComponents(authorIconInput);
+
+        modal.addComponents(row1, row2, row3, row4);
+        await interaction.showModal(modal);
+        return;
+      }
+
+      if (customId.startsWith('sendembed_advanced_modal:')) {
+        const parts = customId.split(':');
+        const slot = Number(parts[1]);
+        const channelId = parts[2];
+
+        if (!channelId) {
+          await interaction.reply({ content: 'Channel data lost. Please run /sendembed again.', ephemeral: true });
+          return;
+        }
+
+        const footer = interaction.fields.getTextInputValue('footer');
+        const footerIconUrl = interaction.fields.getTextInputValue('footer_icon_url');
+        const authorName = interaction.fields.getTextInputValue('author_name');
+        const authorIconUrl = interaction.fields.getTextInputValue('author_icon_url');
+
+        const guildConfig = getGuildConfig(interaction.guild.id);
+        const pendingEmbeds = guildConfig.pendingEmbeds || {};
+        const channelEmbeds = pendingEmbeds[channelId] || { channelId, embeds: Array.from({ length: 10 }, () => null) };
+        const updatedEmbeds = [...channelEmbeds.embeds];
+        const slotIndex = slot - 1;
+        const embedData = updatedEmbeds[slotIndex] || {};
+
+        embedData.footer = footer || null;
+        embedData.footer_icon_url = footerIconUrl || null;
+        embedData.author_name = authorName || null;
+        embedData.author_icon_url = authorIconUrl || null;
+
+        updatedEmbeds[slotIndex] = embedData;
+        channelEmbeds.embeds = updatedEmbeds;
+        pendingEmbeds[channelId] = channelEmbeds;
+
+        setGuildConfig(interaction.guild.id, { pendingEmbeds });
+
+        const continueButton = new ButtonBuilder()
+          .setCustomId(`sendembed_slot:${slot}:${channelId}`)
+          .setLabel('Edit This Slot Again')
+          .setStyle(ButtonStyle.Primary);
+
+        const row = new ActionRowBuilder().addComponents(continueButton);
+
+        await interaction.reply({ content: `Advanced options for slot ${slot} saved!`, components: [row], ephemeral: true });
+        return;
+      }
+
+      if (customId.startsWith('sendembed_preview:')) {
+        const channelId = customId.split(':')[1];
+
+        if (!channelId) {
+          await interaction.reply({ content: 'Channel data lost. Please run /sendembed again.', ephemeral: true });
+          return;
+        }
+
+        const guildConfig = getGuildConfig(interaction.guild.id);
+        const pendingEmbeds = guildConfig.pendingEmbeds || {};
+        const channelEmbeds = pendingEmbeds[channelId];
+
+        if (!channelEmbeds || channelEmbeds.embeds.every((e) => !e)) {
+          await interaction.reply({ content: 'No embeds to preview. Edit some embeds first.', ephemeral: true });
+          return;
+        }
+
+        const embeds = channelEmbeds.embeds.filter((data) => hasEmbeddableContent(data)).map((data) => buildEmbedFromData(data));
+
+        if (embeds.length > 0) {
+          await interaction.reply({
+            content: `**Preview** (${embeds.length} embed${embeds.length > 1 ? 's' : ''})`,
+            embeds,
+            ephemeral: true
+          });
+        } else {
+          await interaction.reply({ content: 'No embeds with content to preview.', ephemeral: true });
+        }
+        return;
+      }
+
+      if (customId.startsWith('sendembed_send:')) {
+        const channelId = customId.split(':')[1];
+
+        if (!channelId) {
+          await interaction.reply({ content: 'Channel data lost. Please run /sendembed again.', ephemeral: true });
+          return;
+        }
+
+        const guildConfig = getGuildConfig(interaction.guild.id);
+        const pendingEmbeds = guildConfig.pendingEmbeds || {};
+        const channelEmbeds = pendingEmbeds[channelId];
+
+        if (!channelEmbeds || channelEmbeds.embeds.every((e) => !e)) {
+          await interaction.reply({ content: 'No embeds to send. Edit some embeds first.', ephemeral: true });
+          return;
+        }
+
+        const targetChannel = await interaction.guild.channels.fetch(channelId).catch(() => null);
+        if (!targetChannel || !targetChannel.isTextBased()) {
+          await interaction.reply({ content: 'Cannot access the target channel.', ephemeral: true });
+          return;
+        }
+
+        try {
+          const embeds = channelEmbeds.embeds.filter((data) => hasEmbeddableContent(data)).map((data) => buildEmbedFromData(data));
+
+          if (embeds.length > 0) {
+            await targetChannel.send({ embeds });
+            await interaction.reply({
+              content: `✅ Sent ${embeds.length} embed(s) to ${targetChannel}!`,
+              ephemeral: true
+            });
+
+            delete pendingEmbeds[channelId];
+            setGuildConfig(interaction.guild.id, { pendingEmbeds });
+          } else {
+            await interaction.reply({ content: 'No embeds with content to send.', ephemeral: true });
+          }
+        } catch (error) {
+          console.error('Embed send error:', error);
+          await interaction.reply({ content: 'Failed to send embeds. Check my permissions.', ephemeral: true });
+        }
+        return;
+      }
+
+      if (customId.startsWith('sendembed_slot:')) {
+        const parts = customId.split(':');
+        const slot = Number(parts[1]);
+        const channelId = parts[2];
+
+        if (!Number.isInteger(slot) || slot < 1 || slot > 10) {
+          await interaction.reply({ content: 'That slot is not available.', ephemeral: true });
+          return;
+        }
+
+        if (!channelId) {
+          await interaction.reply({ content: 'Channel data lost. Please run /sendembed again.', ephemeral: true });
+          return;
+        }
+
+        const guildConfig = getGuildConfig(interaction.guild.id);
+        const pendingEmbeds = guildConfig.pendingEmbeds || {};
+        const channelEmbeds = pendingEmbeds[channelId]?.embeds || Array.from({ length: 10 }, () => null);
+        const currentEmbed = channelEmbeds[slot - 1] || {};
+
+        const modal = new ModalBuilder()
+          .setCustomId(`sendembed_modal:${slot}:${channelId}`)
+          .setTitle(`Edit Embed Slot ${slot}`);
+
+        const titleInput = new TextInputBuilder()
+          .setCustomId('title')
+          .setLabel('Title')
+          .setStyle(TextInputStyle.Short)
+          .setValue(currentEmbed.title || '')
+          .setRequired(false);
+
+        const descriptionInput = new TextInputBuilder()
+          .setCustomId('description')
+          .setLabel('Description')
+          .setStyle(TextInputStyle.Paragraph)
+          .setValue(currentEmbed.description || '')
+          .setRequired(false);
+
+        const colorInput = new TextInputBuilder()
+          .setCustomId('color')
+          .setLabel('Color (hex, e.g. #00ff00)')
+          .setStyle(TextInputStyle.Short)
+          .setValue(currentEmbed.color || '')
+          .setRequired(false);
+
+        const imageUrlInput = new TextInputBuilder()
+          .setCustomId('image_url')
+          .setLabel('Image URL')
+          .setStyle(TextInputStyle.Short)
+          .setValue(currentEmbed.image_url || '')
+          .setRequired(false);
+
+        const thumbnailUrlInput = new TextInputBuilder()
+          .setCustomId('thumbnail_url')
+          .setLabel('Thumbnail URL')
+          .setStyle(TextInputStyle.Short)
+          .setValue(currentEmbed.thumbnail_url || '')
+          .setRequired(false);
+
+        const row1 = new ActionRowBuilder().addComponents(titleInput);
+        const row2 = new ActionRowBuilder().addComponents(descriptionInput);
+        const row3 = new ActionRowBuilder().addComponents(colorInput);
+        const row4 = new ActionRowBuilder().addComponents(imageUrlInput);
+        const row5 = new ActionRowBuilder().addComponents(thumbnailUrlInput);
+
+        modal.addComponents(row1, row2, row3, row4, row5);
+        await interaction.showModal(modal);
+        return;
+      }
+
       if (!customId.startsWith('buttonrole_toggle:')) return;
 
       const roleId = customId.split(':')[1];
@@ -220,6 +552,76 @@ export default {
           .map((name) => ({ name, value: name }));
 
         await interaction.respond(filtered);
+        return;
+      }
+    }
+
+    if (interaction.isModalSubmit()) {
+      const customId = interaction.customId;
+
+      if (customId.startsWith('sendembed_modal:')) {
+        const parts = customId.split(':');
+        const slot = Number(parts[1]);
+        const channelId = parts[2];
+
+        if (!channelId) {
+          await interaction.reply({ content: 'Channel data lost. Please run /sendembed again.', ephemeral: true });
+          return;
+        }
+
+        const title = interaction.fields.getTextInputValue('title');
+        const description = interaction.fields.getTextInputValue('description');
+        const color = interaction.fields.getTextInputValue('color');
+        const imageUrl = interaction.fields.getTextInputValue('image_url');
+        const thumbnailUrl = interaction.fields.getTextInputValue('thumbnail_url');
+
+        const guildConfig = getGuildConfig(interaction.guild.id);
+
+        const pendingEmbeds = guildConfig.pendingEmbeds || {};
+        const channelEmbeds = pendingEmbeds[channelId] || { channelId, embeds: Array.from({ length: 10 }, () => null) };
+        const updatedEmbeds = [...channelEmbeds.embeds];
+        const slotIndex = slot - 1;
+
+        const existingEmbedData = updatedEmbeds[slotIndex] || {};
+        const embedData = {
+          ...existingEmbedData,
+          title: title || null,
+          description: description || null,
+          color: color || null,
+          image_url: imageUrl || null,
+          thumbnail_url: thumbnailUrl || null,
+          fields: Array.isArray(existingEmbedData.fields) ? existingEmbedData.fields : []
+        };
+
+        updatedEmbeds[slotIndex] = hasEmbeddableContent(embedData) ? embedData : null;
+
+        setGuildConfig(interaction.guild.id, {
+          pendingEmbeds: {
+            ...pendingEmbeds,
+            [channelId]: {
+              ...channelEmbeds,
+              embeds: updatedEmbeds
+            }
+          }
+        });
+
+        const advancedButton = new ButtonBuilder()
+          .setCustomId(`sendembed_advanced:${slot}:${channelId}`)
+          .setLabel('Edit Advanced Options')
+          .setStyle(ButtonStyle.Secondary);
+
+        const editAgainButton = new ButtonBuilder()
+          .setCustomId(`sendembed_slot:${slot}:${channelId}`)
+          .setLabel('Edit This Slot Again')
+          .setStyle(ButtonStyle.Primary);
+
+        const row = new ActionRowBuilder().addComponents(advancedButton, editAgainButton);
+
+        await interaction.reply({
+          content: `Saved slot ${slot}. Edit advanced options or edit this slot again.`,
+          components: [row],
+          ephemeral: true
+        });
         return;
       }
     }
