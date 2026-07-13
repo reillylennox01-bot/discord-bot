@@ -55,6 +55,73 @@ function formatWelcomeFieldsForInput(fields) {
     .join('\n');
 }
 
+function formatWelcomeIconUrlsForInput(data) {
+  const lines = [];
+
+  if (data?.footer_icon_url) {
+    lines.push(`Footer: ${data.footer_icon_url}`);
+  }
+
+  if (data?.author_icon_url) {
+    lines.push(`Author: ${data.author_icon_url}`);
+  }
+
+  return lines.join('\n');
+}
+
+function parseWelcomeIconUrlsInput(value) {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return {
+      footerIconUrl: null,
+      authorIconUrl: null
+    };
+  }
+
+  const result = {
+    footerIconUrl: null,
+    authorIconUrl: null
+  };
+
+  const lines = trimmed
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  for (const line of lines) {
+    const separatorIndex = line.indexOf(':');
+    if (separatorIndex === -1) {
+      throw new Error('Icon URLs must be written as Footer: https://... or Author: https://...');
+    }
+
+    const key = line.slice(0, separatorIndex).trim().toLowerCase();
+    const rawUrl = line.slice(separatorIndex + 1).trim();
+
+    if (!rawUrl) {
+      continue;
+    }
+
+    const normalizedUrl = normalizeHttpUrl(rawUrl);
+    if (!normalizedUrl) {
+      throw new Error('Please provide valid icon URLs starting with http:// or https://');
+    }
+
+    if (key === 'footer') {
+      result.footerIconUrl = normalizedUrl;
+      continue;
+    }
+
+    if (key === 'author') {
+      result.authorIconUrl = normalizedUrl;
+      continue;
+    }
+
+    throw new Error('Icon URL lines must start with Footer: or Author:');
+  }
+
+  return result;
+}
+
 function parseWelcomeFieldsInput(value) {
   const trimmed = value.trim();
   if (!trimmed) {
@@ -344,23 +411,18 @@ export default {
           .setStyle(TextInputStyle.Short)
           .setValue(currentEmbed.footer || '')
           .setRequired(false);
-        const footerIconInput = new TextInputBuilder()
-          .setCustomId('footer_icon_url')
-          .setLabel('Footer Icon URL')
-          .setStyle(TextInputStyle.Short)
-          .setValue(currentEmbed.footer_icon_url || '')
-          .setRequired(false);
         const authorNameInput = new TextInputBuilder()
           .setCustomId('author_name')
           .setLabel('Author Name')
           .setStyle(TextInputStyle.Short)
           .setValue(currentEmbed.author_name || '')
           .setRequired(false);
-        const authorIconInput = new TextInputBuilder()
-          .setCustomId('author_icon_url')
-          .setLabel('Author Icon URL')
-          .setStyle(TextInputStyle.Short)
-          .setValue(currentEmbed.author_icon_url || '')
+        const iconUrlsInput = new TextInputBuilder()
+          .setCustomId('icon_urls')
+          .setLabel('Icon URLs (Footer / Author)')
+          .setPlaceholder('Footer: https://...\nAuthor: https://...')
+          .setStyle(TextInputStyle.Paragraph)
+          .setValue(formatWelcomeIconUrlsForInput(currentEmbed))
           .setRequired(false);
         const fieldsInput = new TextInputBuilder()
           .setCustomId('fields')
@@ -371,9 +433,8 @@ export default {
 
         modal.addComponents(
           new ActionRowBuilder().addComponents(footerInput),
-          new ActionRowBuilder().addComponents(footerIconInput),
           new ActionRowBuilder().addComponents(authorNameInput),
-          new ActionRowBuilder().addComponents(authorIconInput),
+          new ActionRowBuilder().addComponents(iconUrlsInput),
           new ActionRowBuilder().addComponents(fieldsInput)
         );
 
@@ -895,21 +956,13 @@ export default {
           return;
         }
 
-        const footerIconInput = interaction.fields.getTextInputValue('footer_icon_url');
-        const authorIconInput = interaction.fields.getTextInputValue('author_icon_url');
+        const iconUrlsInput = interaction.fields.getTextInputValue('icon_urls');
         const fieldsInput = interaction.fields.getTextInputValue('fields');
-        const footerIconUrl = normalizeHttpUrl(footerIconInput);
-        const authorIconUrl = normalizeHttpUrl(authorIconInput);
         let fields = [];
-        if (footerIconInput.trim() && !footerIconUrl) {
-          await interaction.reply({ content: 'Please provide a valid Footer Icon URL starting with http:// or https://', ephemeral: true });
-          return;
-        }
-        if (authorIconInput.trim() && !authorIconUrl) {
-          await interaction.reply({ content: 'Please provide a valid Author Icon URL starting with http:// or https://', ephemeral: true });
-          return;
-        }
+
+        let parsedIconUrls;
         try {
+          parsedIconUrls = parseWelcomeIconUrlsInput(iconUrlsInput);
           fields = parseWelcomeFieldsInput(fieldsInput);
         } catch (error) {
           await interaction.reply({ content: error.message, ephemeral: true });
@@ -922,9 +975,9 @@ export default {
         const existingData = welcomeEmbeds[slotIndex] || {};
 
         existingData.footer = interaction.fields.getTextInputValue('footer') || null;
-        existingData.footer_icon_url = footerIconUrl;
+    existingData.footer_icon_url = parsedIconUrls.footerIconUrl;
         existingData.author_name = interaction.fields.getTextInputValue('author_name') || null;
-        existingData.author_icon_url = authorIconUrl;
+    existingData.author_icon_url = parsedIconUrls.authorIconUrl;
         existingData.fields = fields;
 
         welcomeEmbeds[slotIndex] = existingData;
