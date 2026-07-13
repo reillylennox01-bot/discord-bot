@@ -1,5 +1,6 @@
-import { SlashCommandBuilder, ChannelType } from 'discord.js';
-import { setGuildConfig } from '../utils/settings.js';
+import { SlashCommandBuilder, ChannelType, MessageFlags } from 'discord.js';
+import { getGuildConfig, setGuildConfig } from '../utils/settings.js';
+import { buildWelcomeEmbed } from '../utils/welcomeEmbed.js';
 
 export default {
   data: new SlashCommandBuilder()
@@ -9,7 +10,6 @@ export default {
       option
         .setName('channel')
         .setDescription('The text channel to send welcome messages to')
-        .setRequired(true)
     )
     .addStringOption((option) =>
       option
@@ -60,18 +60,26 @@ export default {
       option
         .setName('send_dm')
         .setDescription('Also send the welcome embed to the member via DM')
+    )
+    .addBooleanOption((option) =>
+      option
+        .setName('preview')
+        .setDescription('Preview the welcome embed after saving')
     ),
   async execute(interaction) {
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+    const guildId = interaction.guild.id;
+    const currentConfig = getGuildConfig(guildId);
     const channel = interaction.options.getChannel('channel');
-    if (!channel || channel.type !== ChannelType.GuildText) {
-      await interaction.reply({
+    if (channel && channel.type !== ChannelType.GuildText) {
+      await interaction.editReply({
         content: 'Please choose a text channel for welcome messages.',
-        ephemeral: true
       });
       return;
     }
 
-    const config = { welcomeChannelId: channel.id };
+    const config = {};
     const title = interaction.options.getString('title');
     const description = interaction.options.getString('description');
     const color = interaction.options.getString('color');
@@ -82,7 +90,9 @@ export default {
     const authorName = interaction.options.getString('author_name');
     const authorIconUrl = interaction.options.getString('author_icon_url');
     const sendDM = interaction.options.getBoolean('send_dm');
+    const shouldPreview = interaction.options.getBoolean('preview') ?? false;
 
+    if (channel) config.welcomeChannelId = channel.id;
     if (title) config.title = title;
     if (description) config.description = description;
     if (color) config.color = color;
@@ -94,11 +104,40 @@ export default {
     if (authorIconUrl) config.authorIconUrl = authorIconUrl;
     if (sendDM !== null) config.sendDM = sendDM;
 
-    setGuildConfig(interaction.guild.id, config);
+    if (Object.keys(config).length === 0 && !shouldPreview) {
+      await interaction.editReply({
+        content: 'No changes provided. Use one or more options to update or preview your welcome message.',
+      });
+      return;
+    }
 
-    await interaction.reply({
-      content: `Welcome settings updated for ${channel}.`,
-      ephemeral: true
+    if (!channel && !currentConfig.welcomeChannelId && !shouldPreview) {
+      await interaction.editReply({
+        content: 'Please choose a text channel for welcome messages.',
+      });
+      return;
+    }
+
+    const mergedConfig = {
+      ...currentConfig,
+      ...config
+    };
+
+    if (Object.keys(config).length > 0) {
+      setGuildConfig(guildId, config);
+    }
+
+    if (shouldPreview) {
+      await interaction.channel.send({
+        content: `Preview of the welcome message${mergedConfig.welcomeChannelId ? ` for <#${mergedConfig.welcomeChannelId}>` : ''}:`,
+        embeds: [buildWelcomeEmbed(interaction.guild, interaction.user, mergedConfig)]
+      });
+    }
+
+    await interaction.editReply({
+      content: Object.keys(config).length > 0
+        ? `Welcome settings updated${mergedConfig.welcomeChannelId ? ` for <#${mergedConfig.welcomeChannelId}>` : ''}.${shouldPreview ? ' Preview sent in this channel.' : ''}`
+        : `Preview sent in this channel.`
     });
   }
 };

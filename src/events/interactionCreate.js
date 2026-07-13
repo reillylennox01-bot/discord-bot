@@ -19,6 +19,7 @@ import {
   ChannelType,
   Collection
 } from 'discord.js';
+import { buildWelcomeEmbed } from '../utils/welcomeEmbed.js';
 
 function parseColor(value) {
   if (!value) return null;
@@ -135,6 +136,18 @@ export default {
   async execute(interaction) {
     if (interaction.isButton()) {
       const customId = interaction.customId;
+
+      if (customId === 'setwelcome_preview') {
+        const config = getGuildConfig(interaction.guild.id);
+        const embed = buildWelcomeEmbed(interaction.guild, interaction.user, config);
+
+        await interaction.reply({
+          content: 'Here is how the welcome message will look:',
+          embeds: [embed],
+          ephemeral: true
+        });
+        return;
+      }
 
       if (customId === 'ticket_open') {
         const guildId = interaction.guild.id;
@@ -660,6 +673,10 @@ export default {
       await command.execute(interaction);
     } catch (error) {
       console.error(error);
+      if (error?.code === 10062 || error?.code === 40060) {
+        return;
+      }
+
       if (interaction.replied || interaction.deferred) {
         await interaction.followUp({ content: 'There was an error while executing this command!', ephemeral: true });
       } else {
