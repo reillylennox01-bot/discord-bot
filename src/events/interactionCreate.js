@@ -19,7 +19,7 @@ import {
   ChannelType,
   Collection
 } from 'discord.js';
-import { buildWelcomeEmbed } from '../utils/welcomeEmbed.js';
+import { buildWelcomeEmbed, buildWelcomeEmbeds } from '../utils/welcomeEmbed.js';
 
 function parseColor(value) {
   if (!value) return null;
@@ -113,29 +113,37 @@ function buildSlotPickerComponents(selectedSlot = null) {
 }
 
 function buildWelcomeEditorButtons() {
-  const firstRow = new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId('editwelcome_slot:content')
-      .setLabel('Slot 1: Content')
-      .setStyle(ButtonStyle.Primary),
-    new ButtonBuilder()
-      .setCustomId('editwelcome_slot:media')
-      .setLabel('Slot 2: Media')
-      .setStyle(ButtonStyle.Primary),
-    new ButtonBuilder()
-      .setCustomId('editwelcome_slot:extras')
-      .setLabel('Slot 3: Extras')
-      .setStyle(ButtonStyle.Primary)
-  );
+  const firstRowButtons = [];
+  for (let index = 1; index <= 5; index += 1) {
+    firstRowButtons.push(
+      new ButtonBuilder()
+        .setCustomId(`editwelcome_slot:${index}`)
+        .setLabel(`Slot ${index}`)
+        .setStyle(ButtonStyle.Primary)
+    );
+  }
 
-  const secondRow = new ActionRowBuilder().addComponents(
+  const secondRowButtons = [];
+  for (let index = 6; index <= 10; index += 1) {
+    secondRowButtons.push(
+      new ButtonBuilder()
+        .setCustomId(`editwelcome_slot:${index}`)
+        .setLabel(`Slot ${index}`)
+        .setStyle(ButtonStyle.Primary)
+    );
+  }
+
+  const firstRow = new ActionRowBuilder().addComponents(...firstRowButtons);
+  const secondRow = new ActionRowBuilder().addComponents(...secondRowButtons);
+
+  const thirdRow = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId('editwelcome_preview')
       .setLabel('Preview Welcome')
       .setStyle(ButtonStyle.Secondary)
   );
 
-  return [firstRow, secondRow];
+  return [firstRow, secondRow, thirdRow];
 }
 
 async function sendTranscript(channel, transcriptChannel) {
@@ -167,98 +175,63 @@ export default {
         const config = getGuildConfig(interaction.guild.id);
         await interaction.reply({
           content: 'Preview of the welcome message:',
-          embeds: [buildWelcomeEmbed(interaction.guild, interaction.user, config)],
+          embeds: buildWelcomeEmbeds(interaction.guild, interaction.user, config),
           ephemeral: true
         });
         return;
       }
 
       if (customId.startsWith('editwelcome_slot:')) {
-        const slot = customId.split(':')[1];
-        const currentConfig = getGuildConfig(interaction.guild.id);
-        const modal = new ModalBuilder()
-          .setCustomId(`editwelcome_modal:${slot}`)
-          .setTitle(`Edit Welcome ${slot === 'content' ? 'Content' : slot === 'media' ? 'Media' : 'Extras'}`);
-
-        if (slot === 'content') {
-          const titleInput = new TextInputBuilder()
-            .setCustomId('title')
-            .setLabel('Title')
-            .setStyle(TextInputStyle.Short)
-            .setValue(currentConfig.title || '')
-            .setRequired(false);
-          const descriptionInput = new TextInputBuilder()
-            .setCustomId('description')
-            .setLabel('Description')
-            .setStyle(TextInputStyle.Paragraph)
-            .setValue(currentConfig.description || '')
-            .setRequired(false);
-          const colorInput = new TextInputBuilder()
-            .setCustomId('color')
-            .setLabel('Color (hex, e.g. #00ff00)')
-            .setStyle(TextInputStyle.Short)
-            .setValue(currentConfig.color || '')
-            .setRequired(false);
-
-          modal.addComponents(
-            new ActionRowBuilder().addComponents(titleInput),
-            new ActionRowBuilder().addComponents(descriptionInput),
-            new ActionRowBuilder().addComponents(colorInput)
-          );
-        } else if (slot === 'media') {
-          const imageInput = new TextInputBuilder()
-            .setCustomId('image_url')
-            .setLabel('Image URL')
-            .setStyle(TextInputStyle.Short)
-            .setValue(currentConfig.imageUrl || '')
-            .setRequired(false);
-          const thumbnailInput = new TextInputBuilder()
-            .setCustomId('thumbnail_url')
-            .setLabel('Thumbnail URL')
-            .setStyle(TextInputStyle.Short)
-            .setValue(currentConfig.thumbnailUrl || '')
-            .setRequired(false);
-          const authorNameInput = new TextInputBuilder()
-            .setCustomId('author_name')
-            .setLabel('Author Name')
-            .setStyle(TextInputStyle.Short)
-            .setValue(currentConfig.authorName || '')
-            .setRequired(false);
-          const authorIconInput = new TextInputBuilder()
-            .setCustomId('author_icon_url')
-            .setLabel('Author Icon URL')
-            .setStyle(TextInputStyle.Short)
-            .setValue(currentConfig.authorIconUrl || '')
-            .setRequired(false);
-
-          modal.addComponents(
-            new ActionRowBuilder().addComponents(imageInput),
-            new ActionRowBuilder().addComponents(thumbnailInput),
-            new ActionRowBuilder().addComponents(authorNameInput),
-            new ActionRowBuilder().addComponents(authorIconInput)
-          );
-        } else if (slot === 'extras') {
-          const footerInput = new TextInputBuilder()
-            .setCustomId('footer')
-            .setLabel('Footer Text')
-            .setStyle(TextInputStyle.Short)
-            .setValue(currentConfig.footer || '')
-            .setRequired(false);
-          const footerIconInput = new TextInputBuilder()
-            .setCustomId('footer_icon_url')
-            .setLabel('Footer Icon URL')
-            .setStyle(TextInputStyle.Short)
-            .setValue(currentConfig.footerIconUrl || '')
-            .setRequired(false);
-
-          modal.addComponents(
-            new ActionRowBuilder().addComponents(footerInput),
-            new ActionRowBuilder().addComponents(footerIconInput)
-          );
-        } else {
-          await interaction.reply({ content: 'That welcome slot is not available.', ephemeral: true });
+        const slot = Number(customId.split(':')[1]);
+        if (!Number.isInteger(slot) || slot < 1 || slot > 10) {
+          await interaction.reply({ content: 'That slot is not available.', ephemeral: true });
           return;
         }
+
+        const currentConfig = getGuildConfig(interaction.guild.id);
+        const currentEmbed = currentConfig.welcomeEmbeds?.[slot - 1] || {};
+        const modal = new ModalBuilder()
+          .setCustomId(`editwelcome_modal:${slot}`)
+          .setTitle(`Edit Welcome Slot ${slot}`);
+
+        const titleInput = new TextInputBuilder()
+          .setCustomId('title')
+          .setLabel('Title')
+          .setStyle(TextInputStyle.Short)
+          .setValue(currentEmbed.title || '')
+          .setRequired(false);
+        const descriptionInput = new TextInputBuilder()
+          .setCustomId('description')
+          .setLabel('Description')
+          .setStyle(TextInputStyle.Paragraph)
+          .setValue(currentEmbed.description || '')
+          .setRequired(false);
+        const colorInput = new TextInputBuilder()
+          .setCustomId('color')
+          .setLabel('Color (hex, e.g. #00ff00)')
+          .setStyle(TextInputStyle.Short)
+          .setValue(currentEmbed.color || '')
+          .setRequired(false);
+        const imageInput = new TextInputBuilder()
+          .setCustomId('image_url')
+          .setLabel('Image URL')
+          .setStyle(TextInputStyle.Short)
+          .setValue(currentEmbed.image_url || '')
+          .setRequired(false);
+        const thumbnailInput = new TextInputBuilder()
+          .setCustomId('thumbnail_url')
+          .setLabel('Thumbnail URL')
+          .setStyle(TextInputStyle.Short)
+          .setValue(currentEmbed.thumbnail_url || '')
+          .setRequired(false);
+
+        modal.addComponents(
+          new ActionRowBuilder().addComponents(titleInput),
+          new ActionRowBuilder().addComponents(descriptionInput),
+          new ActionRowBuilder().addComponents(colorInput),
+          new ActionRowBuilder().addComponents(imageInput),
+          new ActionRowBuilder().addComponents(thumbnailInput)
+        );
 
         await interaction.showModal(modal);
         return;
@@ -700,42 +673,94 @@ export default {
       const customId = interaction.customId;
 
       if (customId.startsWith('editwelcome_modal:')) {
-        const slot = customId.split(':')[1];
-        const config = {};
-
-        if (slot === 'content') {
-          const color = interaction.fields.getTextInputValue('color');
-          if (color) {
-            const normalized = color.trim().replace(/^#/, '');
-            if (!/^[0-9A-Fa-f]{6}$/.test(normalized)) {
-              await interaction.reply({ content: 'Please provide a valid hex color like #00ff00.', ephemeral: true });
-              return;
-            }
-            config.color = `#${normalized}`;
-          } else {
-            config.color = null;
-          }
-
-          config.title = interaction.fields.getTextInputValue('title') || null;
-          config.description = interaction.fields.getTextInputValue('description') || null;
-        } else if (slot === 'media') {
-          config.imageUrl = interaction.fields.getTextInputValue('image_url') || null;
-          config.thumbnailUrl = interaction.fields.getTextInputValue('thumbnail_url') || null;
-          config.authorName = interaction.fields.getTextInputValue('author_name') || null;
-          config.authorIconUrl = interaction.fields.getTextInputValue('author_icon_url') || null;
-        } else if (slot === 'extras') {
-          config.footer = interaction.fields.getTextInputValue('footer') || null;
-          config.footerIconUrl = interaction.fields.getTextInputValue('footer_icon_url') || null;
-        } else {
+        const slot = Number(customId.split(':')[1]);
+        if (!Number.isInteger(slot) || slot < 1 || slot > 10) {
           await interaction.reply({ content: 'That welcome slot is not available.', ephemeral: true });
           return;
         }
 
+        const color = interaction.fields.getTextInputValue('color');
+        if (color) {
+          const normalized = color.trim().replace(/^#/, '');
+          if (!/^[0-9A-Fa-f]{6}$/.test(normalized)) {
+            await interaction.reply({ content: 'Please provide a valid hex color like #00ff00.', ephemeral: true });
+            return;
+          }
+        }
+
+        const guildConfig = getGuildConfig(interaction.guild.id);
+        const welcomeEmbeds = Array.isArray(guildConfig.welcomeEmbeds) ? [...guildConfig.welcomeEmbeds] : Array.from({ length: 10 }, () => null);
+        const slotIndex = slot - 1;
+        const existingData = welcomeEmbeds[slotIndex] || {};
+        const updatedData = {
+          ...existingData,
+          title: interaction.fields.getTextInputValue('title') || null,
+          description: interaction.fields.getTextInputValue('description') || null,
+          color: color || null,
+          image_url: interaction.fields.getTextInputValue('image_url') || null,
+          thumbnail_url: interaction.fields.getTextInputValue('thumbnail_url') || null
+        };
+
+        const hasContent = Boolean(
+          updatedData.title ||
+            updatedData.description ||
+            updatedData.image_url ||
+            updatedData.thumbnail_url ||
+            updatedData.author_name ||
+            updatedData.footer
+        );
+
+        welcomeEmbeds[slotIndex] = hasContent ? updatedData : null;
+
+        setGuildConfig(interaction.guild.id, { welcomeEmbeds });
+
+        const advancedButton = new ButtonBuilder()
+          .setCustomId(`editwelcome_advanced:${slot}`)
+          .setLabel('Edit Advanced Options')
+          .setStyle(ButtonStyle.Secondary);
+        const editAgainButton = new ButtonBuilder()
+          .setCustomId(`editwelcome_slot:${slot}`)
+          .setLabel('Edit This Slot Again')
+          .setStyle(ButtonStyle.Primary);
+
         setGuildConfig(interaction.guild.id, config);
 
         await interaction.reply({
-          content: `Saved welcome ${slot} slot.`,
-          components: buildWelcomeEditorButtons(),
+          content: `Saved welcome slot ${slot}. Edit advanced options or edit this slot again.`,
+          components: [new ActionRowBuilder().addComponents(advancedButton, editAgainButton)],
+          ephemeral: true
+        });
+        return;
+      }
+
+      if (customId.startsWith('editwelcome_advanced_modal:')) {
+        const slot = Number(customId.split(':')[1]);
+        if (!Number.isInteger(slot) || slot < 1 || slot > 10) {
+          await interaction.reply({ content: 'That welcome slot is not available.', ephemeral: true });
+          return;
+        }
+
+        const guildConfig = getGuildConfig(interaction.guild.id);
+        const welcomeEmbeds = Array.isArray(guildConfig.welcomeEmbeds) ? [...guildConfig.welcomeEmbeds] : Array.from({ length: 10 }, () => null);
+        const slotIndex = slot - 1;
+        const existingData = welcomeEmbeds[slotIndex] || {};
+
+        existingData.footer = interaction.fields.getTextInputValue('footer') || null;
+        existingData.footer_icon_url = interaction.fields.getTextInputValue('footer_icon_url') || null;
+        existingData.author_name = interaction.fields.getTextInputValue('author_name') || null;
+        existingData.author_icon_url = interaction.fields.getTextInputValue('author_icon_url') || null;
+
+        welcomeEmbeds[slotIndex] = existingData;
+        setGuildConfig(interaction.guild.id, { welcomeEmbeds });
+
+        await interaction.reply({
+          content: `Advanced options for welcome slot ${slot} saved!`,
+          components: [new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+              .setCustomId(`editwelcome_slot:${slot}`)
+              .setLabel('Edit This Slot Again')
+              .setStyle(ButtonStyle.Primary)
+          )],
           ephemeral: true
         });
         return;

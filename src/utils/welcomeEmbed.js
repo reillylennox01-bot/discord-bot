@@ -32,3 +32,64 @@ export function buildWelcomeEmbed(guild, user, config) {
 
   return embed;
 }
+
+function hasWelcomeEmbedContent(data) {
+  return Boolean(
+    data?.title ||
+      data?.description ||
+      data?.image_url ||
+      data?.imageUrl ||
+      data?.thumbnail_url ||
+      data?.thumbnailUrl ||
+      data?.author_name ||
+      data?.authorName ||
+      data?.footer ||
+      data?.footer_icon_url ||
+      data?.footerIconUrl
+  );
+}
+
+function buildWelcomeEmbedFromSlot(guild, user, data) {
+  const embed = new EmbedBuilder();
+
+  if (data.color) {
+    embed.setColor(parseColor(data.color) ?? 0x00ff00);
+  } else {
+    embed.setColor(0x00ff00);
+  }
+
+  if (data.title) embed.setTitle(data.title);
+  if (data.description) embed.setDescription(data.description);
+  if (data.thumbnail_url || data.thumbnailUrl) {
+    embed.setThumbnail(data.thumbnail_url || data.thumbnailUrl);
+  }
+  if (data.image_url || data.imageUrl) {
+    embed.setImage(data.image_url || data.imageUrl);
+  }
+  if (data.footer || data.footer_icon_url || data.footerIconUrl) {
+    embed.setFooter({
+      text: data.footer || 'Welcome message',
+      iconURL: data.footer_icon_url || data.footerIconUrl || undefined
+    });
+  }
+  if (data.author_name || data.authorName) {
+    embed.setAuthor({
+      name: data.author_name || data.authorName,
+      iconURL: data.author_icon_url || data.authorIconUrl || undefined
+    });
+  }
+
+  return embed;
+}
+
+export function buildWelcomeEmbeds(guild, user, config) {
+  const slotEmbeds = Array.isArray(config.welcomeEmbeds)
+    ? config.welcomeEmbeds.filter((data) => hasWelcomeEmbedContent(data)).map((data) => buildWelcomeEmbedFromSlot(guild, user, data))
+    : [];
+
+  if (slotEmbeds.length > 0) {
+    return slotEmbeds;
+  }
+
+  return [buildWelcomeEmbed(guild, user, config)];
+}
