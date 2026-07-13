@@ -35,8 +35,12 @@ function buildWelcomeEditorComponents() {
   const thirdRow = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId('editwelcome_preview')
-      .setLabel('Preview Welcome')
-      .setStyle(ButtonStyle.Secondary)
+      .setLabel('Preview Embeds')
+      .setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder()
+      .setCustomId('editwelcome_send')
+      .setLabel('Send All Embeds Now')
+      .setStyle(ButtonStyle.Success)
   );
 
   return [firstRow, secondRow, thirdRow];
@@ -84,7 +88,7 @@ export default {
 
     await interaction.editReply({
       components: buildWelcomeEditorComponents(),
-      content: `Use the slot buttons below to edit your welcome embed.${Object.keys(updates).length > 0 ? '\nBasic welcome settings updated.' : ''}`
+      content: `Choose a slot to edit welcome embeds.${Object.keys(updates).length > 0 ? '\nBasic welcome settings updated.' : ''}`
     });
   }
 };

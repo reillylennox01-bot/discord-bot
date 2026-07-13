@@ -139,8 +139,12 @@ function buildWelcomeEditorButtons() {
   const thirdRow = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId('editwelcome_preview')
-      .setLabel('Preview Welcome')
-      .setStyle(ButtonStyle.Secondary)
+      .setLabel('Preview Embeds')
+      .setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder()
+      .setCustomId('editwelcome_send')
+      .setLabel('Send All Embeds Now')
+      .setStyle(ButtonStyle.Success)
   );
 
   return [firstRow, secondRow, thirdRow];
@@ -173,11 +177,43 @@ export default {
 
       if (customId === 'editwelcome_preview') {
         const config = getGuildConfig(interaction.guild.id);
+        const hasWelcomeEmbeds = Array.isArray(config.welcomeEmbeds) && config.welcomeEmbeds.some((embed) => embed);
+        if (!hasWelcomeEmbeds) {
+          await interaction.reply({ content: 'No saved embeds were found for welcome yet.', components: buildWelcomeEditorButtons(), ephemeral: true });
+          return;
+        }
+
         await interaction.reply({
-          content: 'Preview of the welcome message:',
+          content: `**Preview** (${buildWelcomeEmbeds(interaction.guild, interaction.user, config).length} embed${buildWelcomeEmbeds(interaction.guild, interaction.user, config).length > 1 ? 's' : ''})`,
           embeds: buildWelcomeEmbeds(interaction.guild, interaction.user, config),
           ephemeral: true
         });
+        return;
+      }
+
+      if (customId === 'editwelcome_send') {
+        const config = getGuildConfig(interaction.guild.id);
+        const hasWelcomeEmbeds = Array.isArray(config.welcomeEmbeds) && config.welcomeEmbeds.some((embed) => embed);
+        if (!hasWelcomeEmbeds) {
+          await interaction.reply({ content: 'No saved embeds were found for welcome yet.', components: buildWelcomeEditorButtons(), ephemeral: true });
+          return;
+        }
+
+        const channelId = config.welcomeChannelId;
+        if (!channelId) {
+          await interaction.reply({ content: 'No welcome channel is configured yet. Run /setwelcome or /editwelcome channel:#your-channel first.', ephemeral: true });
+          return;
+        }
+
+        const targetChannel = await interaction.guild.channels.fetch(channelId).catch(() => null);
+        if (!targetChannel || !targetChannel.isTextBased()) {
+          await interaction.reply({ content: 'Cannot access the configured welcome channel.', ephemeral: true });
+          return;
+        }
+
+        const embeds = buildWelcomeEmbeds(interaction.guild, interaction.user, config);
+        await targetChannel.send({ embeds });
+        await interaction.reply({ content: `Sent ${embeds.length} welcome embed${embeds.length === 1 ? '' : 's'} to ${targetChannel}.`, ephemeral: true });
         return;
       }
 
@@ -231,6 +267,55 @@ export default {
           new ActionRowBuilder().addComponents(colorInput),
           new ActionRowBuilder().addComponents(imageInput),
           new ActionRowBuilder().addComponents(thumbnailInput)
+        );
+
+        await interaction.showModal(modal);
+        return;
+      }
+
+      if (customId.startsWith('editwelcome_advanced:')) {
+        const slot = Number(customId.split(':')[1]);
+        if (!Number.isInteger(slot) || slot < 1 || slot > 10) {
+          await interaction.reply({ content: 'That welcome slot is not available.', ephemeral: true });
+          return;
+        }
+
+        const currentConfig = getGuildConfig(interaction.guild.id);
+        const currentEmbed = currentConfig.welcomeEmbeds?.[slot - 1] || {};
+        const modal = new ModalBuilder()
+          .setCustomId(`editwelcome_advanced_modal:${slot}`)
+          .setTitle(`Edit Welcome Advanced Options - Slot ${slot}`);
+
+        const footerInput = new TextInputBuilder()
+          .setCustomId('footer')
+          .setLabel('Footer Text')
+          .setStyle(TextInputStyle.Short)
+          .setValue(currentEmbed.footer || '')
+          .setRequired(false);
+        const footerIconInput = new TextInputBuilder()
+          .setCustomId('footer_icon_url')
+          .setLabel('Footer Icon URL')
+          .setStyle(TextInputStyle.Short)
+          .setValue(currentEmbed.footer_icon_url || '')
+          .setRequired(false);
+        const authorNameInput = new TextInputBuilder()
+          .setCustomId('author_name')
+          .setLabel('Author Name')
+          .setStyle(TextInputStyle.Short)
+          .setValue(currentEmbed.author_name || '')
+          .setRequired(false);
+        const authorIconInput = new TextInputBuilder()
+          .setCustomId('author_icon_url')
+          .setLabel('Author Icon URL')
+          .setStyle(TextInputStyle.Short)
+          .setValue(currentEmbed.author_icon_url || '')
+          .setRequired(false);
+
+        modal.addComponents(
+          new ActionRowBuilder().addComponents(footerInput),
+          new ActionRowBuilder().addComponents(footerIconInput),
+          new ActionRowBuilder().addComponents(authorNameInput),
+          new ActionRowBuilder().addComponents(authorIconInput)
         );
 
         await interaction.showModal(modal);
@@ -722,8 +807,6 @@ export default {
           .setCustomId(`editwelcome_slot:${slot}`)
           .setLabel('Edit This Slot Again')
           .setStyle(ButtonStyle.Primary);
-
-        setGuildConfig(interaction.guild.id, config);
 
         await interaction.reply({
           content: `Saved welcome slot ${slot}. Edit advanced options or edit this slot again.`,
