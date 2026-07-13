@@ -1,4 +1,11 @@
-import { SlashCommandBuilder, ChannelType, MessageFlags } from 'discord.js';
+import {
+  SlashCommandBuilder,
+  ChannelType,
+  MessageFlags,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle
+} from 'discord.js';
 import { getGuildConfig, setGuildConfig } from '../utils/settings.js';
 import { buildWelcomeEmbed } from '../utils/welcomeEmbed.js';
 
@@ -7,6 +14,32 @@ function parseColor(value) {
   const normalized = value.trim().replace(/^#/, '');
   if (!/^[0-9A-Fa-f]{6}$/.test(normalized)) return null;
   return normalized;
+}
+
+function buildWelcomeEditorComponents() {
+  const firstRow = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId('editwelcome_slot:content')
+      .setLabel('Slot 1: Content')
+      .setStyle(ButtonStyle.Primary),
+    new ButtonBuilder()
+      .setCustomId('editwelcome_slot:media')
+      .setLabel('Slot 2: Media')
+      .setStyle(ButtonStyle.Primary),
+    new ButtonBuilder()
+      .setCustomId('editwelcome_slot:extras')
+      .setLabel('Slot 3: Extras')
+      .setStyle(ButtonStyle.Primary)
+  );
+
+  const secondRow = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId('editwelcome_preview')
+      .setLabel('Preview Welcome')
+      .setStyle(ButtonStyle.Secondary)
+  );
+
+  return [firstRow, secondRow];
 }
 
 export default {
@@ -140,9 +173,10 @@ export default {
     }
 
     await interaction.editReply({
+      components: buildWelcomeEditorComponents(),
       content: hasChanges
-        ? `Welcome message settings updated.${updatedFields ? '\n' + updatedFields : ''}${shouldSendPreview ? '\nPreview sent in this channel.' : ''}`
-        : 'Preview sent in this channel.'
+        ? `Welcome message settings updated.${updatedFields ? '\n' + updatedFields : ''}${shouldSendPreview ? '\nPreview sent in this channel.' : ''}\nUse the slot buttons below to keep editing the embed.`
+        : `Preview sent in this channel.\nUse the slot buttons below to edit the embed.`
     });
   }
 };
