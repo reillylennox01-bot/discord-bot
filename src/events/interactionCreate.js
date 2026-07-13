@@ -975,9 +975,9 @@ export default {
         const existingData = welcomeEmbeds[slotIndex] || {};
 
         existingData.footer = interaction.fields.getTextInputValue('footer') || null;
-    existingData.footer_icon_url = parsedIconUrls.footerIconUrl;
+        existingData.footer_icon_url = parsedIconUrls.footerIconUrl;
         existingData.author_name = interaction.fields.getTextInputValue('author_name') || null;
-    existingData.author_icon_url = parsedIconUrls.authorIconUrl;
+        existingData.author_icon_url = parsedIconUrls.authorIconUrl;
         existingData.fields = fields;
 
         welcomeEmbeds[slotIndex] = existingData;
