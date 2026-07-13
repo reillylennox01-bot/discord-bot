@@ -26,7 +26,11 @@ export default {
     const embeds = buildWelcomeEmbeds(member.guild, member.user, config);
 
     if (welcomeChannel && welcomeChannel.type === ChannelType.GuildText) {
-      await welcomeChannel.send({ embeds }).catch(() => null);
+      await welcomeChannel.send({
+        content: `<@${member.id}>`,
+        embeds,
+        allowedMentions: { users: [member.id] }
+      }).catch(() => null);
     }
 
     if (config.sendDM) {
