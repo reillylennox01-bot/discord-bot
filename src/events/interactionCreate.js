@@ -44,6 +44,42 @@ function normalizeHttpUrl(value) {
   }
 }
 
+function formatWelcomeFieldsForInput(fields) {
+  if (!Array.isArray(fields) || fields.length === 0) {
+    return '';
+  }
+
+  return fields
+    .filter((field) => field?.name && field?.value)
+    .map((field) => `${field.name} | ${field.value} | ${field.inline ? 'inline' : 'block'}`)
+    .join('\n');
+}
+
+function parseWelcomeFieldsInput(value) {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return [];
+  }
+
+  return trimmed
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const parts = line.split('|').map((part) => part.trim());
+      if (parts.length < 2 || !parts[0] || !parts[1]) {
+        throw new Error('Each field line must be in the format: Name | Value | inline');
+      }
+
+      const inlineValue = (parts[2] || '').toLowerCase();
+      return {
+        name: parts[0],
+        value: parts[1],
+        inline: inlineValue === 'inline' || inlineValue === 'true' || inlineValue === 'yes'
+      };
+    });
+}
+
 function buildEmbedFromData(data) {
   const embed = new EmbedBuilder();
 
@@ -326,12 +362,19 @@ export default {
           .setStyle(TextInputStyle.Short)
           .setValue(currentEmbed.author_icon_url || '')
           .setRequired(false);
+        const fieldsInput = new TextInputBuilder()
+          .setCustomId('fields')
+          .setLabel('Fields: Name | Value | inline')
+          .setStyle(TextInputStyle.Paragraph)
+          .setValue(formatWelcomeFieldsForInput(currentEmbed.fields))
+          .setRequired(false);
 
         modal.addComponents(
           new ActionRowBuilder().addComponents(footerInput),
           new ActionRowBuilder().addComponents(footerIconInput),
           new ActionRowBuilder().addComponents(authorNameInput),
-          new ActionRowBuilder().addComponents(authorIconInput)
+          new ActionRowBuilder().addComponents(authorIconInput),
+          new ActionRowBuilder().addComponents(fieldsInput)
         );
 
         await interaction.showModal(modal);
@@ -854,14 +897,22 @@ export default {
 
         const footerIconInput = interaction.fields.getTextInputValue('footer_icon_url');
         const authorIconInput = interaction.fields.getTextInputValue('author_icon_url');
+        const fieldsInput = interaction.fields.getTextInputValue('fields');
         const footerIconUrl = normalizeHttpUrl(footerIconInput);
         const authorIconUrl = normalizeHttpUrl(authorIconInput);
+        let fields = [];
         if (footerIconInput.trim() && !footerIconUrl) {
           await interaction.reply({ content: 'Please provide a valid Footer Icon URL starting with http:// or https://', ephemeral: true });
           return;
         }
         if (authorIconInput.trim() && !authorIconUrl) {
           await interaction.reply({ content: 'Please provide a valid Author Icon URL starting with http:// or https://', ephemeral: true });
+          return;
+        }
+        try {
+          fields = parseWelcomeFieldsInput(fieldsInput);
+        } catch (error) {
+          await interaction.reply({ content: error.message, ephemeral: true });
           return;
         }
 
@@ -874,6 +925,7 @@ export default {
         existingData.footer_icon_url = footerIconUrl;
         existingData.author_name = interaction.fields.getTextInputValue('author_name') || null;
         existingData.author_icon_url = authorIconUrl;
+        existingData.fields = fields;
 
         welcomeEmbeds[slotIndex] = existingData;
         setGuildConfig(interaction.guild.id, { welcomeEmbeds });

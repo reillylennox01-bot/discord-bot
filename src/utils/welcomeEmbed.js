@@ -66,7 +66,8 @@ function hasWelcomeEmbedContent(data) {
       data?.authorName ||
       data?.footer ||
       data?.footer_icon_url ||
-      data?.footerIconUrl
+      data?.footerIconUrl ||
+      (Array.isArray(data?.fields) && data.fields.some((field) => field?.name && field?.value))
   );
 }
 
@@ -102,6 +103,19 @@ function buildWelcomeEmbedFromSlot(guild, user, data) {
       name: data.author_name || data.authorName,
       iconURL: authorIconUrl || undefined
     });
+  }
+
+  const fields = Array.isArray(data.fields) ? data.fields : [];
+  if (fields.length > 0) {
+    embed.addFields(
+      fields
+        .filter((field) => field?.name && field?.value)
+        .map((field) => ({
+          name: String(field.name),
+          value: String(field.value),
+          inline: Boolean(field.inline)
+        }))
+    );
   }
 
   return embed;
