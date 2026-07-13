@@ -28,6 +28,22 @@ function parseColor(value) {
   return parseInt(hex, 16);
 }
 
+function normalizeHttpUrl(value) {
+  if (!value) return null;
+  const trimmed = String(value).trim();
+  if (!trimmed) return null;
+
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return null;
+    }
+    return parsed.toString();
+  } catch {
+    return null;
+  }
+}
+
 function buildEmbedFromData(data) {
   const embed = new EmbedBuilder();
 
@@ -773,6 +789,19 @@ export default {
           }
         }
 
+        const imageUrlInput = interaction.fields.getTextInputValue('image_url');
+        const thumbnailUrlInput = interaction.fields.getTextInputValue('thumbnail_url');
+        const imageUrl = normalizeHttpUrl(imageUrlInput);
+        const thumbnailUrl = normalizeHttpUrl(thumbnailUrlInput);
+        if (imageUrlInput.trim() && !imageUrl) {
+          await interaction.reply({ content: 'Please provide a valid Image URL starting with http:// or https://', ephemeral: true });
+          return;
+        }
+        if (thumbnailUrlInput.trim() && !thumbnailUrl) {
+          await interaction.reply({ content: 'Please provide a valid Thumbnail URL starting with http:// or https://', ephemeral: true });
+          return;
+        }
+
         const guildConfig = getGuildConfig(interaction.guild.id);
         const welcomeEmbeds = Array.isArray(guildConfig.welcomeEmbeds) ? [...guildConfig.welcomeEmbeds] : Array.from({ length: 10 }, () => null);
         const slotIndex = slot - 1;
@@ -782,8 +811,8 @@ export default {
           title: interaction.fields.getTextInputValue('title') || null,
           description: interaction.fields.getTextInputValue('description') || null,
           color: color || null,
-          image_url: interaction.fields.getTextInputValue('image_url') || null,
-          thumbnail_url: interaction.fields.getTextInputValue('thumbnail_url') || null
+          image_url: imageUrl,
+          thumbnail_url: thumbnailUrl
         };
 
         const hasContent = Boolean(
@@ -823,15 +852,28 @@ export default {
           return;
         }
 
+        const footerIconInput = interaction.fields.getTextInputValue('footer_icon_url');
+        const authorIconInput = interaction.fields.getTextInputValue('author_icon_url');
+        const footerIconUrl = normalizeHttpUrl(footerIconInput);
+        const authorIconUrl = normalizeHttpUrl(authorIconInput);
+        if (footerIconInput.trim() && !footerIconUrl) {
+          await interaction.reply({ content: 'Please provide a valid Footer Icon URL starting with http:// or https://', ephemeral: true });
+          return;
+        }
+        if (authorIconInput.trim() && !authorIconUrl) {
+          await interaction.reply({ content: 'Please provide a valid Author Icon URL starting with http:// or https://', ephemeral: true });
+          return;
+        }
+
         const guildConfig = getGuildConfig(interaction.guild.id);
         const welcomeEmbeds = Array.isArray(guildConfig.welcomeEmbeds) ? [...guildConfig.welcomeEmbeds] : Array.from({ length: 10 }, () => null);
         const slotIndex = slot - 1;
         const existingData = welcomeEmbeds[slotIndex] || {};
 
         existingData.footer = interaction.fields.getTextInputValue('footer') || null;
-        existingData.footer_icon_url = interaction.fields.getTextInputValue('footer_icon_url') || null;
+        existingData.footer_icon_url = footerIconUrl;
         existingData.author_name = interaction.fields.getTextInputValue('author_name') || null;
-        existingData.author_icon_url = interaction.fields.getTextInputValue('author_icon_url') || null;
+        existingData.author_icon_url = authorIconUrl;
 
         welcomeEmbeds[slotIndex] = existingData;
         setGuildConfig(interaction.guild.id, { welcomeEmbeds });

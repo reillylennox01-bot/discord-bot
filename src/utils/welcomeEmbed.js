@@ -7,27 +7,48 @@ function parseColor(value) {
   return parseInt(normalized, 16);
 }
 
+function normalizeHttpUrl(value) {
+  if (!value) return null;
+  const trimmed = String(value).trim();
+  if (!trimmed) return null;
+
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return null;
+    }
+    return parsed.toString();
+  } catch {
+    return null;
+  }
+}
+
 export function buildWelcomeEmbed(guild, user, config) {
+  const thumbnailUrl = normalizeHttpUrl(config.thumbnailUrl);
+  const imageUrl = normalizeHttpUrl(config.imageUrl);
+  const footerIconUrl = normalizeHttpUrl(config.footerIconUrl);
+  const authorIconUrl = normalizeHttpUrl(config.authorIconUrl);
+
   const embed = new EmbedBuilder()
     .setColor(parseColor(config.color) ?? 0x00ff00)
     .setTitle(config.title || `Welcome to ${guild.name}!`)
     .setDescription(
       config.description || `Hello ${user}, welcome to **${guild.name}**! We're happy to have you here.`
     )
-    .setThumbnail(config.thumbnailUrl || user.displayAvatarURL({ extension: 'png', size: 512 }))
+    .setThumbnail(thumbnailUrl || user.displayAvatarURL({ extension: 'png', size: 512 }))
     .addFields(
       { name: 'Member Count', value: `${guild.memberCount}`, inline: true },
       { name: 'Get Started', value: 'Read the rules and say hello in chat!', inline: true }
     )
-    .setFooter({ text: config.footer || 'Welcome message', iconURL: config.footerIconUrl ?? undefined })
+    .setFooter({ text: config.footer || 'Welcome message', iconURL: footerIconUrl ?? undefined })
     .setTimestamp();
 
-  if (config.imageUrl) {
-    embed.setImage(config.imageUrl);
+  if (imageUrl) {
+    embed.setImage(imageUrl);
   }
 
   if (config.authorName) {
-    embed.setAuthor({ name: config.authorName, iconURL: config.authorIconUrl ?? undefined });
+    embed.setAuthor({ name: config.authorName, iconURL: authorIconUrl ?? undefined });
   }
 
   return embed;
@@ -50,6 +71,10 @@ function hasWelcomeEmbedContent(data) {
 }
 
 function buildWelcomeEmbedFromSlot(guild, user, data) {
+  const thumbnailUrl = normalizeHttpUrl(data.thumbnail_url || data.thumbnailUrl);
+  const imageUrl = normalizeHttpUrl(data.image_url || data.imageUrl);
+  const footerIconUrl = normalizeHttpUrl(data.footer_icon_url || data.footerIconUrl);
+  const authorIconUrl = normalizeHttpUrl(data.author_icon_url || data.authorIconUrl);
   const embed = new EmbedBuilder();
 
   if (data.color) {
@@ -60,22 +85,22 @@ function buildWelcomeEmbedFromSlot(guild, user, data) {
 
   if (data.title) embed.setTitle(data.title);
   if (data.description) embed.setDescription(data.description);
-  if (data.thumbnail_url || data.thumbnailUrl) {
-    embed.setThumbnail(data.thumbnail_url || data.thumbnailUrl);
+  if (thumbnailUrl) {
+    embed.setThumbnail(thumbnailUrl);
   }
-  if (data.image_url || data.imageUrl) {
-    embed.setImage(data.image_url || data.imageUrl);
+  if (imageUrl) {
+    embed.setImage(imageUrl);
   }
   if (data.footer || data.footer_icon_url || data.footerIconUrl) {
     embed.setFooter({
       text: data.footer || 'Welcome message',
-      iconURL: data.footer_icon_url || data.footerIconUrl || undefined
+      iconURL: footerIconUrl || undefined
     });
   }
   if (data.author_name || data.authorName) {
     embed.setAuthor({
       name: data.author_name || data.authorName,
-      iconURL: data.author_icon_url || data.authorIconUrl || undefined
+      iconURL: authorIconUrl || undefined
     });
   }
 
