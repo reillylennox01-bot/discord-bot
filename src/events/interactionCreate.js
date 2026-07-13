@@ -362,6 +362,31 @@ export default {
           .setStyle(TextInputStyle.Short)
           .setValue(currentEmbed.author_icon_url || '')
           .setRequired(false);
+
+        modal.addComponents(
+          new ActionRowBuilder().addComponents(footerInput),
+          new ActionRowBuilder().addComponents(footerIconInput),
+          new ActionRowBuilder().addComponents(authorNameInput),
+          new ActionRowBuilder().addComponents(authorIconInput)
+        );
+
+        await interaction.showModal(modal);
+        return;
+      }
+
+      if (customId.startsWith('editwelcome_fields:')) {
+        const slot = Number(customId.split(':')[1]);
+        if (!Number.isInteger(slot) || slot < 1 || slot > 10) {
+          await interaction.reply({ content: 'That welcome slot is not available.', ephemeral: true });
+          return;
+        }
+
+        const currentConfig = getGuildConfig(interaction.guild.id);
+        const currentEmbed = currentConfig.welcomeEmbeds?.[slot - 1] || {};
+        const modal = new ModalBuilder()
+          .setCustomId(`editwelcome_fields_modal:${slot}`)
+          .setTitle(`Edit Welcome Fields - Slot ${slot}`);
+
         const fieldsInput = new TextInputBuilder()
           .setCustomId('fields')
           .setLabel('Fields: Name | Value | inline')
@@ -369,14 +394,7 @@ export default {
           .setValue(formatWelcomeFieldsForInput(currentEmbed.fields))
           .setRequired(false);
 
-        modal.addComponents(
-          new ActionRowBuilder().addComponents(footerInput),
-          new ActionRowBuilder().addComponents(footerIconInput),
-          new ActionRowBuilder().addComponents(authorNameInput),
-          new ActionRowBuilder().addComponents(authorIconInput),
-          new ActionRowBuilder().addComponents(fieldsInput)
-        );
-
+        modal.addComponents(new ActionRowBuilder().addComponents(fieldsInput));
         await interaction.showModal(modal);
         return;
       }
@@ -875,6 +893,10 @@ export default {
           .setCustomId(`editwelcome_advanced:${slot}`)
           .setLabel('Edit Advanced Options')
           .setStyle(ButtonStyle.Secondary);
+        const fieldsButton = new ButtonBuilder()
+          .setCustomId(`editwelcome_fields:${slot}`)
+          .setLabel('Edit Fields')
+          .setStyle(ButtonStyle.Secondary);
         const editAgainButton = new ButtonBuilder()
           .setCustomId(`editwelcome_slot:${slot}`)
           .setLabel('Edit This Slot Again')
@@ -882,7 +904,7 @@ export default {
 
         await interaction.reply({
           content: `Saved welcome slot ${slot}. Edit advanced options or edit this slot again.`,
-          components: [new ActionRowBuilder().addComponents(advancedButton, editAgainButton)],
+          components: [new ActionRowBuilder().addComponents(advancedButton, fieldsButton, editAgainButton)],
           ephemeral: true
         });
         return;
@@ -897,22 +919,14 @@ export default {
 
         const footerIconInput = interaction.fields.getTextInputValue('footer_icon_url');
         const authorIconInput = interaction.fields.getTextInputValue('author_icon_url');
-        const fieldsInput = interaction.fields.getTextInputValue('fields');
         const footerIconUrl = normalizeHttpUrl(footerIconInput);
         const authorIconUrl = normalizeHttpUrl(authorIconInput);
-        let fields = [];
         if (footerIconInput.trim() && !footerIconUrl) {
           await interaction.reply({ content: 'Please provide a valid Footer Icon URL starting with http:// or https://', ephemeral: true });
           return;
         }
         if (authorIconInput.trim() && !authorIconUrl) {
           await interaction.reply({ content: 'Please provide a valid Author Icon URL starting with http:// or https://', ephemeral: true });
-          return;
-        }
-        try {
-          fields = parseWelcomeFieldsInput(fieldsInput);
-        } catch (error) {
-          await interaction.reply({ content: error.message, ephemeral: true });
           return;
         }
 
@@ -925,7 +939,6 @@ export default {
         existingData.footer_icon_url = footerIconUrl;
         existingData.author_name = interaction.fields.getTextInputValue('author_name') || null;
         existingData.author_icon_url = authorIconUrl;
-        existingData.fields = fields;
 
         welcomeEmbeds[slotIndex] = existingData;
         setGuildConfig(interaction.guild.id, { welcomeEmbeds });
@@ -933,6 +946,50 @@ export default {
         await interaction.reply({
           content: `Advanced options for welcome slot ${slot} saved!`,
           components: [new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+              .setCustomId(`editwelcome_fields:${slot}`)
+              .setLabel('Edit Fields')
+              .setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder()
+              .setCustomId(`editwelcome_slot:${slot}`)
+              .setLabel('Edit This Slot Again')
+              .setStyle(ButtonStyle.Primary)
+          )],
+          ephemeral: true
+        });
+        return;
+      }
+
+      if (customId.startsWith('editwelcome_fields_modal:')) {
+        const slot = Number(customId.split(':')[1]);
+        if (!Number.isInteger(slot) || slot < 1 || slot > 10) {
+          await interaction.reply({ content: 'That welcome slot is not available.', ephemeral: true });
+          return;
+        }
+
+        let fields = [];
+        try {
+          fields = parseWelcomeFieldsInput(interaction.fields.getTextInputValue('fields'));
+        } catch (error) {
+          await interaction.reply({ content: error.message, ephemeral: true });
+          return;
+        }
+
+        const guildConfig = getGuildConfig(interaction.guild.id);
+        const welcomeEmbeds = Array.isArray(guildConfig.welcomeEmbeds) ? [...guildConfig.welcomeEmbeds] : Array.from({ length: 10 }, () => null);
+        const slotIndex = slot - 1;
+        const existingData = welcomeEmbeds[slotIndex] || {};
+        existingData.fields = fields;
+        welcomeEmbeds[slotIndex] = existingData;
+        setGuildConfig(interaction.guild.id, { welcomeEmbeds });
+
+        await interaction.reply({
+          content: `Fields for welcome slot ${slot} saved!`,
+          components: [new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+              .setCustomId(`editwelcome_advanced:${slot}`)
+              .setLabel('Edit Advanced Options')
+              .setStyle(ButtonStyle.Secondary),
             new ButtonBuilder()
               .setCustomId(`editwelcome_slot:${slot}`)
               .setLabel('Edit This Slot Again')
