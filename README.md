@@ -115,12 +115,13 @@ When enabled, AutoMod deletes blocked content and optionally logs the action to 
 Set your Twitch streamer and notification channel using `/setstreamer`.
 The bot will check Twitch every 60 seconds and post a live notification when the configured streamer goes live.
 
-## Deploy to Render (Background Worker)
+## Deploy to Render (Web Service)
 
 1. Create a Render account at https://render.com and connect your GitHub repository.
 
-2. In your repo, `render.yaml` includes a `worker` service named `discord-bot` that uses `npm start`.
-   - Render will run `npm install` during build and `npm start` to run the bot.
+2. In your repo, `render.yaml` includes a `web` service named `discord-bot` that uses `npm start`.
+   - Render will run `npm install` during build and `npm start` to keep the bot alive.
+   - The bot exposes a health endpoint at `/` so Render can keep it awake.
 
 3. IMPORTANT: Set environment variables in the Render dashboard for your service.
    - Go to your project → Service → Environment → Add Environment Variable
@@ -129,6 +130,6 @@ The bot will check Twitch every 60 seconds and post a live notification when the
 4. Deploy the service from the Render UI (or push to the branch linked to the service). Check logs for `Logged in as` to confirm startup.
 
 Notes:
-- The service type is `worker` because the bot does not expose an HTTP port.
-- The free plan may sleep or have limits; use a paid plan for guaranteed 24/7 uptime.
+- The app listens on the `PORT` environment variable provided by Render.
+- Free plans may still sleep after inactivity; use a paid plan for guaranteed 24/7 uptime.
 

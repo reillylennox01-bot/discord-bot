@@ -1,10 +1,11 @@
 services:
-  - type: worker
+  - type: web
     name: discord-bot
     env: node
     plan: free
     buildCommand: npm install
     startCommand: npm start
+    healthCheckPath: /
     # Do NOT store real secrets in this file. Set them in the Render dashboard instead.
     envVars:
       - key: DISCORD_TOKEN
