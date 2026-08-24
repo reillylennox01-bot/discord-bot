@@ -1,17 +1,22 @@
-import { SlashCommandBuilder, ChannelType, EmbedBuilder } from 'discord.js';
-import { getGuildConfig } from '../utils/settings.js';
+import {
+  SlashCommandBuilder,
+  ChannelType,
+  EmbedBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle,
+  PermissionFlagsBits
+} from 'discord.js';
+import { getGuildConfig, setGuildConfig } from '../utils/settings.js';
 
 function parseColor(value) {
   if (!value) return null;
   const normalized = value.trim().replace(/^#/, '');
   if (!/^[0-9A-Fa-f]{6}$/.test(normalized)) return null;
   return parseInt(normalized, 16);
-}
-
-function parseMessageId(value) {
-  if (!value) return null;
-  const match = value.match(/(\d{17,19})$/);
-  return match ? match[1] : value;
 }
 
 function buildEmbedFromExisting(existingEmbed) {
@@ -32,17 +37,26 @@ function buildEmbedFromExisting(existingEmbed) {
 export default {
   data: new SlashCommandBuilder()
     .setName('editembed')
-    .setDescription('Edit the last embed sent by the bot or a specific embed message')
+    .setDescription('Edit an embed in a message (admin only)')
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .addChannelOption((option) =>
       option
         .setName('channel')
         .setDescription('The channel containing the embed message')
         .addChannelTypes(ChannelType.GuildText)
+        .setRequired(true)
     )
     .addStringOption((option) =>
       option
         .setName('message_id')
-        .setDescription('The ID or link of the embed message to edit')
+        .setDescription('The ID of the message with the embed to edit')
+        .setRequired(true)
+    )
+    .addChannelOption((option) =>
+      option
+        .setName('resend_to')
+        .setDescription('Send all embeds from this message to another channel')
+        .addChannelTypes(ChannelType.GuildText)
     )
     .addStringOption((option) =>
       option.setName('title').setDescription('Update embed title')
@@ -70,63 +84,21 @@ export default {
     )
     .addStringOption((option) =>
       option.setName('author_icon_url').setDescription('Update embed author icon URL')
-    )
-    .addStringOption((option) =>
-      option.setName('field1_name').setDescription('Field 1 title')
-    )
-    .addStringOption((option) =>
-      option.setName('field1_value').setDescription('Field 1 value')
-    )
-    .addBooleanOption((option) =>
-      option.setName('field1_inline').setDescription('Field 1 inline?')
-    )
-    .addStringOption((option) =>
-      option.setName('field2_name').setDescription('Field 2 title')
-    )
-    .addStringOption((option) =>
-      option.setName('field2_value').setDescription('Field 2 value')
-    )
-    .addBooleanOption((option) =>
-      option.setName('field2_inline').setDescription('Field 2 inline?')
-    )
-    .addStringOption((option) =>
-      option.setName('field3_name').setDescription('Field 3 title')
-    )
-    .addStringOption((option) =>
-      option.setName('field3_value').setDescription('Field 3 value')
-    )
-    .addBooleanOption((option) =>
-      option.setName('field3_inline').setDescription('Field 3 inline?')
-    )
-    .addBooleanOption((option) =>
-      option.setName('clear_fields')
-        .setDescription('Clear all existing embed fields before editing')
     ),
 
   async execute(interaction) {
-    const guildId = interaction.guild.id;
     const channel = interaction.options.getChannel('channel');
-    const messageIdOption = interaction.options.getString('message_id');
+    const messageId = interaction.options.getString('message_id');
+    const resendTo = interaction.options.getChannel('resend_to');
 
-    const config = getGuildConfig(guildId);
-    const lastEmbed = config.lastEmbed;
-
-    const targetChannel = channel || (lastEmbed ? await interaction.guild.channels.fetch(lastEmbed.channelId).catch(() => null) : null);
-    const targetMessageId = messageIdOption ? parseMessageId(messageIdOption) : lastEmbed?.messageId;
-
-    if (!targetChannel || !targetChannel.isTextBased()) {
-      await interaction.reply({ content: 'Please specify the text channel containing the embed message or send an embed first.', ephemeral: true });
+    if (!channel || channel.type !== ChannelType.GuildText) {
+      await interaction.reply({ content: 'Please specify a valid text channel.', ephemeral: true });
       return;
     }
 
-    if (!targetMessageId) {
-      await interaction.reply({ content: 'Please provide a message ID or send an embed first so the bot can remember the message.', ephemeral: true });
-      return;
-    }
-
-    const message = await targetChannel.messages.fetch(targetMessageId).catch(() => null);
+    const message = await channel.messages.fetch(messageId).catch(() => null);
     if (!message) {
-      await interaction.reply({ content: 'Could not find that message in the selected channel.', ephemeral: true });
+      await interaction.reply({ content: `Could not find message with ID \`${messageId}\` in ${channel}.`, ephemeral: true });
       return;
     }
 
@@ -135,14 +107,48 @@ export default {
       return;
     }
 
-    const existingEmbed = message.embeds[0];
-    if (!existingEmbed) {
-      await interaction.reply({ content: 'That message does not contain an embed to edit.', ephemeral: true });
+    if (!message.embeds || message.embeds.length === 0) {
+      await interaction.reply({ content: 'That message does not contain any embeds to edit.', ephemeral: true });
       return;
     }
 
-    const embed = buildEmbedFromExisting(existingEmbed.data);
+    // Handle resend
+    if (resendTo) {
+      if (!resendTo.isTextBased()) {
+        await interaction.reply({ content: 'Please specify a text channel to resend to.', ephemeral: true });
+        return;
+      }
 
+      try {
+        // Convert embeds to EmbedBuilder to preserve all data
+        const embeds = message.embeds.map(embedData => {
+          const embed = new EmbedBuilder();
+          if (embedData.title) embed.setTitle(embedData.title);
+          if (embedData.description) embed.setDescription(embedData.description);
+          if (embedData.color) embed.setColor(embedData.color);
+          if (embedData.url) embed.setURL(embedData.url);
+          if (embedData.timestamp) embed.setTimestamp(embedData.timestamp);
+          if (embedData.image?.url) embed.setImage(embedData.image.url);
+          if (embedData.thumbnail?.url) embed.setThumbnail(embedData.thumbnail.url);
+          if (embedData.footer?.text) embed.setFooter({ text: embedData.footer.text, iconURL: embedData.footer.iconURL ?? undefined });
+          if (embedData.author?.name) embed.setAuthor({ name: embedData.author.name, iconURL: embedData.author.iconURL ?? undefined, url: embedData.author.url ?? undefined });
+          if (embedData.fields?.length) embed.addFields(embedData.fields.map((field) => ({ name: field.name, value: field.value, inline: field.inline ?? false })));
+          return embed;
+        });
+
+        await resendTo.send({ embeds });
+        await interaction.reply({
+          content: `✅ Resent ${message.embeds.length} embed${message.embeds.length === 1 ? '' : 's'} to ${resendTo}`,
+          ephemeral: true
+        });
+      } catch (error) {
+        console.error('Error resending embeds:', error);
+        await interaction.reply({ content: 'Failed to resend embeds. Check my permissions in that channel.', ephemeral: true });
+      }
+      return;
+    }
+
+    // Check if any optional parameters were provided
     const title = interaction.options.getString('title');
     const description = interaction.options.getString('description');
     const color = interaction.options.getString('color');
@@ -152,7 +158,110 @@ export default {
     const footerIconUrl = interaction.options.getString('footer_icon_url');
     const authorName = interaction.options.getString('author_name');
     const authorIconUrl = interaction.options.getString('author_icon_url');
-    const clearFields = interaction.options.getBoolean('clear_fields');
+
+    const hasQuickEdits = title !== null || description !== null || color !== null || imageUrl !== null || thumbnailUrl !== null || footer !== null || authorName !== null || authorIconUrl !== null;
+
+    // If message has only 1 embed and no quick edits, show picker UI
+    if (message.embeds.length === 1 && !hasQuickEdits) {
+      const modal = new ModalBuilder()
+        .setCustomId(`editembed_modal:${channel.id}:${messageId}:0`)
+        .setTitle('Edit Embed');
+
+      const existingEmbed = message.embeds[0];
+      const titleInput = new TextInputBuilder()
+        .setCustomId('title')
+        .setLabel('Title')
+        .setStyle(TextInputStyle.Short)
+        .setValue(existingEmbed.title || '')
+        .setRequired(false);
+
+      const descriptionInput = new TextInputBuilder()
+        .setCustomId('description')
+        .setLabel('Description')
+        .setStyle(TextInputStyle.Paragraph)
+        .setValue(existingEmbed.description || '')
+        .setRequired(false);
+
+      const colorInput = new TextInputBuilder()
+        .setCustomId('color')
+        .setLabel('Color (hex, e.g. #00ff00)')
+        .setStyle(TextInputStyle.Short)
+        .setValue((existingEmbed.color?.toString(16) || '').padStart(6, '0'))
+        .setRequired(false);
+
+      const imageUrlInput = new TextInputBuilder()
+        .setCustomId('image_url')
+        .setLabel('Image URL')
+        .setStyle(TextInputStyle.Short)
+        .setValue(existingEmbed.image?.url || '')
+        .setRequired(false);
+
+      const thumbnailUrlInput = new TextInputBuilder()
+        .setCustomId('thumbnail_url')
+        .setLabel('Thumbnail URL')
+        .setStyle(TextInputStyle.Short)
+        .setValue(existingEmbed.thumbnail?.url || '')
+        .setRequired(false);
+
+      modal.addComponents(
+        new ActionRowBuilder().addComponents(titleInput),
+        new ActionRowBuilder().addComponents(descriptionInput),
+        new ActionRowBuilder().addComponents(colorInput),
+        new ActionRowBuilder().addComponents(imageUrlInput),
+        new ActionRowBuilder().addComponents(thumbnailUrlInput)
+      );
+
+      await interaction.showModal(modal);
+      return;
+    }
+
+    // If multiple embeds, show embed picker
+    if (message.embeds.length > 1 && !hasQuickEdits) {
+      const firstRow = [];
+      for (let index = 0; index < Math.min(5, message.embeds.length); index += 1) {
+        firstRow.push(
+          new ButtonBuilder()
+            .setCustomId(`editembed_select:${channel.id}:${messageId}:${index}`)
+            .setLabel(`Embed ${index + 1}`)
+            .setStyle(ButtonStyle.Primary)
+        );
+      }
+
+      const rows = [new ActionRowBuilder().addComponents(...firstRow)];
+
+      if (message.embeds.length > 5) {
+        const secondRow = [];
+        for (let index = 5; index < Math.min(10, message.embeds.length); index += 1) {
+          secondRow.push(
+            new ButtonBuilder()
+              .setCustomId(`editembed_select:${channel.id}:${messageId}:${index}`)
+              .setLabel(`Embed ${index + 1}`)
+              .setStyle(ButtonStyle.Primary)
+          );
+        }
+        rows.push(new ActionRowBuilder().addComponents(...secondRow));
+      }
+
+      // Add resend button
+      const resendRow = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setCustomId(`editembed_resend:${channel.id}:${messageId}`)
+          .setLabel('Resend Message')
+          .setStyle(ButtonStyle.Secondary)
+      );
+      rows.push(resendRow);
+
+      await interaction.reply({
+        content: `This message has **${message.embeds.length}** embeds. Choose which one to edit:`,
+        components: rows,
+        ephemeral: true
+      });
+      return;
+    }
+
+    // Handle quick edits
+    const existingEmbed = message.embeds[0];
+    const embed = buildEmbedFromExisting(existingEmbed.data);
 
     if (title !== null) embed.setTitle(title);
     if (description !== null) embed.setDescription(description);
@@ -180,45 +289,10 @@ export default {
       embed.setAuthor({ name: existingEmbed.author.name, iconURL: authorIconUrl });
     }
 
-    if (clearFields) {
-      embed.setFields([]);
-    }
-
-    const updatedFields = [];
-    for (let index = 1; index <= 3; index += 1) {
-      const name = interaction.options.getString(`field${index}_name`);
-      const value = interaction.options.getString(`field${index}_value`);
-      const inline = interaction.options.getBoolean(`field${index}_inline`);
-      if (name !== null || value !== null) {
-        if (!name || !value) {
-          await interaction.reply({ content: `Field ${index} requires both a name and a value.`, ephemeral: true });
-          return;
-        }
-        updatedFields.push({ name, value, inline: Boolean(inline) });
-      }
-    }
-
-    if (updatedFields.length > 0) {
-      embed.data.fields = updatedFields;
-    }
-
-    if (
-      title === null &&
-      description === null &&
-      color === null &&
-      imageUrl === null &&
-      thumbnailUrl === null &&
-      footer === null &&
-      authorName === null &&
-      authorIconUrl === null &&
-      !clearFields &&
-      updatedFields.length === 0
-    ) {
-      await interaction.reply({ content: 'No edit options were provided. Use at least one option to update the embed.', ephemeral: true });
-      return;
-    }
-
-    await message.edit({ embeds: [embed] });
+    const embeds = [...message.embeds];
+    embeds[0] = embed;
+    
+    await message.edit({ embeds });
     await interaction.reply({ content: 'Embed updated successfully.', ephemeral: true });
   }
 };

@@ -67,10 +67,12 @@ function hasEmbedContent(data) {
   );
 }
 
-function buildSlotPickerComponents(selectedSlot = null, channelId = null) {
+function buildSlotPickerComponents(selectedSlot = null, channelId = null, messageId = null) {
   const firstRow = [];
   for (let index = 1; index <= 5; index += 1) {
-    const buttonId = channelId ? `sendembed_slot:${index}:${channelId}` : `sendembed_slot:${index}`;
+    let buttonId = `sendembed_slot:${index}`;
+    if (channelId) buttonId += `:${channelId}`;
+    if (messageId) buttonId += `:${messageId}`;
     firstRow.push(
       new ButtonBuilder()
         .setCustomId(buttonId)
@@ -81,7 +83,9 @@ function buildSlotPickerComponents(selectedSlot = null, channelId = null) {
 
   const secondRow = [];
   for (let index = 6; index <= 10; index += 1) {
-    const buttonId = channelId ? `sendembed_slot:${index}:${channelId}` : `sendembed_slot:${index}`;
+    let buttonId = `sendembed_slot:${index}`;
+    if (channelId) buttonId += `:${channelId}`;
+    if (messageId) buttonId += `:${messageId}`;
     secondRow.push(
       new ButtonBuilder()
         .setCustomId(buttonId)
@@ -90,13 +94,24 @@ function buildSlotPickerComponents(selectedSlot = null, channelId = null) {
     );
   }
 
+  let previewId = 'sendembed_preview';
+  let sendId = 'sendembed_send';
+  if (channelId) {
+    previewId += `:${channelId}`;
+    sendId += `:${channelId}`;
+  }
+  if (messageId) {
+    previewId += `:${messageId}`;
+    sendId += `:${messageId}`;
+  }
+
   const previewButton = new ButtonBuilder()
-    .setCustomId(channelId ? `sendembed_preview:${channelId}` : 'sendembed_preview')
+    .setCustomId(previewId)
     .setLabel('Preview Embeds')
     .setStyle(ButtonStyle.Secondary);
 
   const sendButton = new ButtonBuilder()
-    .setCustomId(channelId ? `sendembed_send:${channelId}` : 'sendembed_send')
+    .setCustomId(sendId)
     .setLabel('Send All Embeds Now')
     .setStyle(ButtonStyle.Success);
 
@@ -120,6 +135,9 @@ export default {
         .setRequired(true)
         .addChannelTypes(ChannelType.GuildText)
     )
+    .addStringOption((option) =>
+      option.setName('message_id').setDescription('Message ID to update with selected embed slot (optional)')
+    )
     .addBooleanOption((option) => option.setName('send_now').setDescription('Send all saved embeds for this channel in one message')),
   async execute(interaction) {
     const channel = interaction.options.getChannel('channel');
@@ -131,10 +149,24 @@ export default {
       return;
     }
 
+    const messageIdOption = interaction.options.getString('message_id');
     const sendNow = interaction.options.getBoolean('send_now') || false;
     const guildConfig = getGuildConfig(interaction.guild.id);
     const pendingEmbeds = guildConfig.pendingEmbeds || {};
     const channelPendingEmbeds = pendingEmbeds[channel.id] || { channelId: channel.id, embeds: Array.from({ length: 10 }, () => null) };
+
+    // If message_id is provided, verify it exists
+    let targetMessage = null;
+    if (messageIdOption) {
+      targetMessage = await channel.messages.fetch(messageIdOption).catch(() => null);
+      if (!targetMessage) {
+        await interaction.reply({
+          content: `Could not find message with ID \`${messageIdOption}\` in ${channel}.`,
+          ephemeral: true
+        });
+        return;
+      }
+    }
 
     if (sendNow) {
       const updatedEmbeds = channelPendingEmbeds.embeds;
@@ -145,7 +177,7 @@ export default {
       if (!embedsToSend.length) {
         await interaction.reply({
           content: 'No saved embeds were found for this channel yet.',
-          components: buildSlotPickerComponents(null, channel.id),
+          components: buildSlotPickerComponents(null, channel.id, messageIdOption),
           ephemeral: true
         });
         return;
@@ -168,7 +200,7 @@ export default {
 
       await interaction.reply({
         content: `Sent ${embedsToSend.length} embed${embedsToSend.length === 1 ? '' : 's'} to ${channel} in one message. Choose a slot below to build more.`,
-        components: buildSlotPickerComponents(null, channel.id),
+        components: buildSlotPickerComponents(null, channel.id, messageIdOption),
         ephemeral: true
       });
       return;
@@ -178,10 +210,15 @@ export default {
       pendingEmbeds: guildConfig.pendingEmbeds || {}
     });
 
+    const replyContent = messageIdOption
+      ? `Choose a slot to edit embeds for ${channel}. Selected embed will update [that message](${targetMessage.url}).`
+      : `Choose a slot to edit embeds for ${channel}. Click a slot to open the editor.`;
+
     await interaction.reply({
-      content: `Choose a slot to edit embeds for ${channel}. Click a slot to open the editor.`,
-      components: buildSlotPickerComponents(null, channel.id),
-      ephemeral: true
+      content: replyContent,
+      components: buildSlotPickerComponents(null, channel.id, messageIdOption),
+      ephemeral: true,
+      allowedMentions: { parse: [] }
     });
   }
 };

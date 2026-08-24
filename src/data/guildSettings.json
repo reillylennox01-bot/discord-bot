@@ -1,42 +1,42 @@
 {
   "1507436010118709470": {
-    "welcomeChannelId": "1507759604598312980",
-    "twitchStreamer": "reillylenno_x",
-    "twitchNotifyChannelId": "1507764046638874635",
-    "title": "**WELCOME TO FOG&THORN DISCORD👾**",
-    "description": "Todd has noticed your arrival… and decided to spare your soul. For now. 🔮 This server is a cosy gothic space for gaming, horror, late-night chaos, chill vibes, and hanging out with the community. ✨ Whether you’re here for streams, spooky games, retro nostalgia, or just to lurk in the shadows. ⚰️",
-    "color": "#743089",
-    "footer": "You're offically part of the family now!",
-    "imageUrl": "https://media.discordapp.net/attachments/1275149694795907123/1507799879546830848/TWITCH_BANNER_1.png?ex=6a13e050&is=6a128ed0&hm=687035750fcffc00e2f30f37f4ebc77c76aec87ccbff8c3787e18641baa66611&=&format=webp&quality=lossless&width=756&height=303",
-    "thumbnailUrl": "https://media.discordapp.net/attachments/1275149694795907123/1507818072377921636/image_2026-05-23_164319148-removebg-preview.png?ex=6a13f142&is=6a129fc2&hm=78337b45259d93ec44ffe5b602e07b2071f1e8327c95b67b924f127b3fcf59f5&=&format=webp&quality=lossless&width=424&height=395",
-    "authorName": "F&T Twitch 🌙",
-    "reactionRoles": {
-      "channelId": "1507762669359464649",
-      "messageId": "1508157415944884334",
-      "roles": []
+    "ticket": {
+      "panelChannelId": "1508438785719799879",
+      "messageId": "1538680317093875754",
+      "categoryId": "1507759505687974048",
+      "staffRoleId": "1507805275309080628",
+      "transcriptChannelId": "1508431085778894918",
+      "openTickets": {
+        "1275145371496091728": "1528026751488495866",
+        "958071805292191865": "1528026921378644098"
+      },
+      "panelTitle": null,
+      "panelDescription": null,
+      "panelButtonLabel": "Open Ticket",
+      "panelButtonStyle": "Success",
+      "panelFooter": null,
+      "panelColor": null,
+      "panelFields": [],
+      "panelEmbeds": [
+        {
+          "title": "F&T Support Tickets",
+          "description": "Welcome to F&T Tickets. Please make sure you read the information displayed above before contacting staff. Once you have done please press the button below.",
+          "color": 7419530,
+          "image_url": null
+        }
+      ],
+      "ticketTitle": "F&T Support Tickets 🌙",
+      "ticketDescription": "You've opened a support ticket. Please tell us what brings you into the shadows and give us as much detail as possible so our staff can help. Whether something is broken, you have a question, or you've encountered an issue within the server, we'll be here to help.",
+      "ticketFooter": "Todd has carried your request into the darkness. Someone will answer soon.",
+      "ticketColor": 7419530,
+      "ticketFields": [],
+      "ticketImageUrl": "https://media.discordapp.net/attachments/1508064104202633237/1538681468170010644/content.png?ex=6a839049&is=6a823ec9&hm=d5cb71c3560ac2228bf3e9ea0b8edc1460a61fc3844e03dff82ba781a96a0865&=&format=webp&quality=lossless&width=640&height=320"
     },
-    "spookyMemeChannelId": "1507763526721339413",
-    "spookyMemeEnabled": true,
-    "lastEmbed": {
-      "channelId": "1507762669359464649",
-      "messageId": "1508429986057687050"
-    },
-    "twitchLinkedAccounts": {
-      "reillylenno_x": "958071805292191865"
-    },
-    "automod": {
-      "enabled": true,
-      "blockLinks": false,
-      "blockedWords": [],
-      "blockedLinks": [],
-      "logChannelId": "1508431022482657372"
-    },
-    "moderation": {
-      "logChannelId": "1508431022482657372"
-    },
+    "pendingEmbeds": {},
     "serverGuide": {
-      "title": "**F&T Server Guide** ⚰️",
+      "title": "**F&T Server Guide ⚰️**",
       "description": "Welcome to F&T here is a quick server guide to help you know where you want to go:",
+      "footer": "You're offically part of the family now! 🔮",
       "color": "#71368a",
       "fields": [
         {
@@ -46,7 +46,7 @@
         },
         {
           "name": "Twitch Area 📺",
-          "value": "The twitch area is the main catergory within the server, this is where you will find, stream notifications when F&T are live on twitch, you will be able to link your twitch account as well to get perks within discord please make sure you read the embed in ⁠<#1507762669359464649> as not everyone is eliagble for the perks, you will be able to post clips that you have got from F&T's stream, and you will be able to discover more about Todd the F&T's mascot and helper.",
+          "value": "The twitch area is the main catergory within the server, this is where you will find, stream notifications when F&T are live on twitch, you will be able to link your twitch account as well to get perks within discord please make sure you read the embed in <#1507762669359464649>⁠⁠ as not everyone is eliagble for the perks, you will be able to post clips that you have got from F&T's stream, and you will be able to discover more about Todd the F&T's mascot and helper.",
           "inline": false
         },
         {
@@ -64,61 +64,21 @@
           "value": "This is where you will find a variety of voice channels that lost souls can hop in at any time to game, chat, watch streams etc",
           "inline": false
         }
-      ],
-      "footer": "You're offically part of the family now! 🔮"
-    },
-    "ticket": {
-      "panelChannelId": "1508438785719799879",
-      "messageId": "1508439241716138014",
-      "categoryId": "1507759505687974048",
-      "staffRoleId": "1507805275309080628",
-      "transcriptChannelId": "1508431085778894918",
-      "openTickets": {},
-      "panelTitle": "F&T Support Ticket  🌙",
-      "panelDescription": "Are you looking for some support? Have an issue within the server or a problem with a member/staff? Press the button below to open a private ticket channel for support. A new ticket will be created for you.",
-      "panelButtonLabel": "F&T Support Ticket",
-      "panelFooter": "A support ticket will be created for you, please read information inside the ticket!",
-      "ticketTitle": "**F&T Support Ticket**  🌙",
-      "ticketDescription": "Thank you for opening a ticket, <@&1507805275309080628>  will be with you as soon as possible. Please not that if its __an emergency__ please ping /@forest keeper they will get to you when they can, if a staff member does respond to your ticket and deems it necessary that it needs esculating they will pass it on to a moderator. Please keep in mind if you are spam pinging any member of staff whether it is a staff member, mod, or admin you will recieve modlogs, we will get to you as quick as possible, please be paitent with us. On another note if the any of the below apply to you please send it in a text message this will help staff support you as quickly and effeciently as they can.",
-      "ticketFooter": "Thank you for co-operation!•Today at 13:46",
-      "ticketColor": 7419530,
-      "panelColor": 7419530,
-      "panelButtonStyle": "Secondary",
-      "ticketFields": [
-        {
-          "name": "A clear description of the issue or question",
-          "value": "Please make sure you provide staff with a clear description of what has happened.",
-          "inline": true
-        },
-        {
-          "name": "Any relevant screenshots or error messages",
-          "value": "Please provide staff with any relevant screenshots/screen grabs of your situation.",
-          "inline": true
-        },
-        {
-          "name": "If any, the person of concern username or other important details",
-          "value": "if possible please provide user id for the individual and a screenshot/screengrab of their profile.",
-          "inline": true
-        }
-      ],
-      "ticketImageUrl": "https://media.discordapp.net/attachments/1275149694795907123/1507799879546830848/TWITCH_BANNER_1.png?ex=6a1531d0&is=6a13e050&hm=550c47538a4bb3263c172b88fa14d36588c173c51cc26228640eca13d03da436&=&format=webp&quality=lossless&width=2500&height=1000"
-    },
-    "commandRoleDeny": {
-      "automod": [
-        "1508162960072118272"
-      ],
-      "moderation": [
-        "1508162960072118272"
-      ],
-      "modlog": [
-        "1508162960072118272"
-      ],
-      "ticket": [
-        "1508162960072118272"
-      ],
-      "twitchsubrole": [
-        "1508162960072118272"
       ]
-    }
+    },
+    "welcomeChannelId": null,
+    "sendDM": false,
+    "welcomeEmbeds": [],
+    "twitchStreamer": "fog_thorn",
+    "twitchNotifyChannelId": "1507764046638874635",
+    "title": null,
+    "description": null,
+    "color": null,
+    "imageUrl": null,
+    "thumbnailUrl": null,
+    "footer": null,
+    "footerIconUrl": null,
+    "authorName": null,
+    "authorIconUrl": null
   }
 }

@@ -10,6 +10,65 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+const lockFilePath = path.join(__dirname, '..', 'data', 'bot.lock');
+fs.mkdirSync(path.dirname(lockFilePath), { recursive: true });
+
+let lockHandle;
+try {
+  lockHandle = fs.openSync(lockFilePath, 'wx');
+  fs.writeFileSync(lockHandle, String(process.pid));
+  console.log('Bot startup lock acquired.');
+} catch (error) {
+  if (error && error.code === 'EEXIST') {
+    let existingPid;
+    try {
+      existingPid = Number(fs.readFileSync(lockFilePath, 'utf8').trim());
+      if (existingPid) {
+        process.kill(existingPid, 0);
+      }
+    } catch (lockError) {
+      if (!existingPid || lockError.code === 'ESRCH' || lockError.code === 'ENOENT') {
+        fs.unlinkSync(lockFilePath);
+        lockHandle = fs.openSync(lockFilePath, 'wx');
+        fs.writeFileSync(lockHandle, String(process.pid));
+        console.log('Removed stale bot startup lock and acquired a new one.');
+      } else {
+        throw lockError;
+      }
+    }
+    if (!lockHandle) {
+      console.error('Another bot instance is already running. Shutting down this duplicate runtime.');
+      process.exit(1);
+    }
+  } else {
+    throw error;
+  }
+}
+
+const releaseLock = () => {
+  try {
+    if (lockHandle) {
+      fs.closeSync(lockHandle);
+      lockHandle = null;
+    }
+    if (fs.existsSync(lockFilePath)) {
+      fs.unlinkSync(lockFilePath);
+    }
+  } catch (error) {
+    console.warn('Could not release bot startup lock:', error.message);
+  }
+};
+
+process.on('exit', releaseLock);
+process.on('SIGINT', () => {
+  releaseLock();
+  process.exit(0);
+});
+process.on('SIGTERM', () => {
+  releaseLock();
+  process.exit(0);
+});
+
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -52,7 +111,22 @@ for (const file of eventFiles) {
       if (event.default.once) {
         client.once(event.default.name, (...args) => event.default.execute(...args, client));
       } else {
-        client.on(event.default.name, (...args) => event.default.execute(...args, client));
+        client.on(event.default.name, async (...args) => {
+          try {
+            await event.default.execute(...args, client);
+          } catch (error) {
+            console.error(`Error in ${event.default.name} event handler:`, error);
+            if (event.default.name === 'interactionCreate') {
+              const interaction = args[0];
+              if (interaction?.isRepliable?.() && !interaction.replied && !interaction.deferred) {
+                await interaction.reply({
+                  content: 'Something went wrong while handling that interaction. Please try again.',
+                  ephemeral: true
+                }).catch(() => null);
+              }
+            }
+          }
+        });
       }
       console.log(`Loaded event handler: ${event.default.name}`);
     }

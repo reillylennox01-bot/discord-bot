@@ -43,6 +43,15 @@ export default {
     )
     .addSubcommand((subcommand) =>
       subcommand.setName('publish').setDescription('Publish or update the button role message')
+    )
+    .addSubcommand((subcommand) =>
+      subcommand
+        .setName('setmessage')
+        .setDescription('Attach button roles to an existing message by ID')
+        .addChannelOption((option) =>
+          option.setName('channel').setDescription('Channel containing the message').addChannelTypes(ChannelType.GuildText).setRequired(true)
+        )
+        .addStringOption((option) => option.setName('message_id').setDescription('Message ID to attach buttons to').setRequired(true))
     ),
   async execute(interaction) {
     const guildId = interaction.guild.id;
@@ -139,6 +148,45 @@ export default {
         return;
       }
       await interaction.reply({ content: 'Button role message published.', ephemeral: true });
+      return;
+    }
+
+    if (subcommand === 'setmessage') {
+      const channel = interaction.options.getChannel('channel');
+      const messageId = interaction.options.getString('message_id');
+
+      if (!channel || channel.type !== ChannelType.GuildText) {
+        await interaction.reply({ content: 'Please specify a valid text channel.', ephemeral: true });
+        return;
+      }
+
+      if (!config.roles || config.roles.length === 0) {
+        await interaction.reply({ content: 'Add button roles first with `/buttonroles add`.', ephemeral: true });
+        return;
+      }
+
+      const message = await channel.messages.fetch(messageId).catch(() => null);
+      if (!message) {
+        await interaction.reply({ content: `Could not find message with ID \`${messageId}\` in ${channel}.`, ephemeral: true });
+        return;
+      }
+
+      // Update config with the message info
+      config.channelId = channel.id;
+      config.messageId = messageId;
+      setButtonRolesConfig(guildId, config);
+
+      // Build buttons and add them to the message
+      const { buildButtonRows } = await import('../utils/buttonRoles.js');
+      const components = buildButtonRows(config);
+
+      try {
+        await message.edit({ components });
+        await interaction.reply({ content: `✅ Button roles attached to [that message](${message.url}).`, ephemeral: true, allowedMentions: { parse: [] } });
+      } catch (error) {
+        console.error('Error attaching buttons:', error);
+        await interaction.reply({ content: 'Failed to attach buttons. Make sure I have permission to edit that message.', ephemeral: true });
+      }
       return;
     }
   }

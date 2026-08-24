@@ -122,12 +122,33 @@ function buildWelcomeEmbedFromSlot(guild, user, data) {
 }
 
 export function buildWelcomeEmbeds(guild, user, config) {
-  const slotEmbeds = Array.isArray(config.welcomeEmbeds)
-    ? config.welcomeEmbeds.filter((data) => hasWelcomeEmbedContent(data)).map((data) => buildWelcomeEmbedFromSlot(guild, user, data))
-    : [];
+  const firstSlotEmbed = Array.isArray(config.welcomeEmbeds)
+    ? config.welcomeEmbeds.find((data) => hasWelcomeEmbedContent(data))
+    : null;
 
-  if (slotEmbeds.length > 0) {
-    return slotEmbeds;
+  if (firstSlotEmbed) {
+    return [buildWelcomeEmbedFromSlot(guild, user, firstSlotEmbed)];
+  }
+
+  const hasDirectWelcomeConfig = Boolean(
+    config?.title ||
+      config?.description ||
+      config?.color ||
+      config?.imageUrl ||
+      config?.thumbnailUrl ||
+      config?.footer ||
+      config?.footerIconUrl ||
+      config?.authorName ||
+      config?.authorIconUrl ||
+      config?.image_url ||
+      config?.thumbnail_url ||
+      config?.footer_icon_url ||
+      config?.author_name ||
+      config?.author_icon_url
+  );
+
+  if (hasDirectWelcomeConfig) {
+    return [buildWelcomeEmbed(guild, user, config)];
   }
 
   return [buildWelcomeEmbed(guild, user, config)];

@@ -124,7 +124,10 @@ export default {
     };
 
     if (Object.keys(config).length > 0) {
-      setGuildConfig(guildId, config);
+      setGuildConfig(guildId, {
+        ...config,
+        welcomeEmbeds: []
+      });
     }
 
     if (shouldPreview) {

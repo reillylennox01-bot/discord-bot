@@ -4,32 +4,60 @@ import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const dataDir = path.join(__dirname, '..', 'data');
-const settingsFile = path.join(dataDir, 'guildSettings.json');
+const rootDataDir = path.join(__dirname, '..', '..', 'data');
+const legacyDataDir = path.join(__dirname, '..', 'data');
+const settingsFile = path.join(rootDataDir, 'guildSettings.json');
+const legacySettingsFile = path.join(legacyDataDir, 'guildSettings.json');
 
-function ensureDataFile() {
-  if (!fs.existsSync(dataDir)) {
-    fs.mkdirSync(dataDir, { recursive: true });
+function ensureDataFile(filePath) {
+  const dirPath = path.dirname(filePath);
+  if (!fs.existsSync(dirPath)) {
+    fs.mkdirSync(dirPath, { recursive: true });
   }
-  if (!fs.existsSync(settingsFile)) {
-    fs.writeFileSync(settingsFile, JSON.stringify({}, null, 2));
+  if (!fs.existsSync(filePath)) {
+    fs.writeFileSync(filePath, JSON.stringify({}, null, 2));
   }
 }
 
-function loadSettings() {
-  ensureDataFile();
+function deepMerge(target, source) {
+  if (Array.isArray(target) && Array.isArray(source)) {
+    return source;
+  }
+
+  if (target && typeof target === 'object' && !Array.isArray(target) && source && typeof source === 'object' && !Array.isArray(source)) {
+    const merged = { ...target };
+    for (const [key, value] of Object.entries(source)) {
+      merged[key] = key in merged ? deepMerge(merged[key], value) : value;
+    }
+    return merged;
+  }
+
+  return source;
+}
+
+function readSettingsFile(filePath) {
+  ensureDataFile(filePath);
   try {
-    const raw = fs.readFileSync(settingsFile, 'utf8');
+    const raw = fs.readFileSync(filePath, 'utf8');
     return JSON.parse(raw || '{}');
   } catch (error) {
-    console.error('Failed to load guild settings:', error);
+    console.error(`Failed to load guild settings from ${filePath}:`, error);
     return {};
   }
 }
 
+function loadSettings() {
+  const legacySettings = readSettingsFile(legacySettingsFile);
+  const currentSettings = readSettingsFile(settingsFile);
+
+  return deepMerge(legacySettings, currentSettings);
+}
+
 function saveSettings(settings) {
-  ensureDataFile();
+  ensureDataFile(settingsFile);
+  ensureDataFile(legacySettingsFile);
   fs.writeFileSync(settingsFile, JSON.stringify(settings, null, 2));
+  fs.writeFileSync(legacySettingsFile, JSON.stringify(settings, null, 2));
 }
 
 export function getGuildConfig(guildId) {

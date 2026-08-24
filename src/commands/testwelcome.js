@@ -26,6 +26,13 @@ export default {
       }
 
       const config = getGuildConfig(interaction.guild.id);
+      if (!config.welcomeChannelId) {
+        await interaction.editReply({
+          content: 'Welcome messages are currently disabled. Configure a channel with /setwelcome before testing.'
+        });
+        return;
+      }
+
       const embeds = buildWelcomeEmbeds(interaction.guild, interaction.user, config);
 
       await interaction.editReply({

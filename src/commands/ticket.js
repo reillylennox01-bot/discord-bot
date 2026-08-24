@@ -5,9 +5,12 @@ import {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
-  EmbedBuilder
+  EmbedBuilder,
+  TextInputBuilder,
+  TextInputStyle,
+  ModalBuilder
 } from 'discord.js';
-import { getTicketConfig, setTicketConfig, addOpenTicket, removeOpenTicket, findTicketOwnerByChannel } from '../utils/tickets.js';
+import { getTicketConfig, setTicketConfig, addOpenTicket, removeOpenTicket, findTicketOwnerByChannel, publishTicketPanel } from '../utils/tickets.js';
 
 function parseHexColor(value) {
   if (!value) return null;
@@ -18,21 +21,86 @@ function parseHexColor(value) {
   return Number(`0x${normalized}`);
 }
 
-function buildTicketPanelEmbed(config) {
-  const embed = new EmbedBuilder()
-    .setTitle(config.panelTitle || 'Open a Support Ticket')
-    .setDescription(config.panelDescription || 'Press the button below to open a private ticket channel for support.')
-    .setColor(config.panelColor ?? 0x5865f2)
-    .setFooter({ text: config.panelFooter || 'A new ticket will be created for you.' });
+function buildEmbedFromData(data) {
+  const embed = new EmbedBuilder();
 
-  if (config.panelFields?.length) {
-    for (const field of config.panelFields) {
-      if (!field.name || !field.value) continue;
-      embed.addFields({ name: field.name, value: field.value, inline: !!field.inline });
-    }
+  if (data.title) embed.setTitle(data.title);
+  if (data.description) embed.setDescription(data.description);
+  if (data.color) embed.setColor(data.color);
+  if (data.footer) embed.setFooter({ text: data.footer });
+
+  const fields = Array.isArray(data.fields) ? data.fields : [];
+  if (fields.length > 0) {
+    embed.addFields(
+      fields
+        .filter((field) => field.name && field.value)
+        .map((field) => ({
+          name: field.name,
+          value: String(field.value),
+          inline: Boolean(field.inline)
+        }))
+    );
   }
 
   return embed;
+}
+
+function hasEmbedContent(data) {
+  return Boolean(data?.title || data?.description || (Array.isArray(data?.fields) && data.fields.some((field) => field?.name && field?.value)));
+}
+
+function buildSlotPickerComponents(selectedSlot = null, channelId = null) {
+  const firstRow = [];
+  for (let index = 1; index <= 5; index += 1) {
+    let buttonId = `ticketedit_slot:${index}`;
+    if (channelId) buttonId += `:${channelId}`;
+    firstRow.push(
+      new ButtonBuilder()
+        .setCustomId(buttonId)
+        .setLabel(`Slot ${index}`)
+        .setStyle(selectedSlot === index ? ButtonStyle.Success : ButtonStyle.Primary)
+    );
+  }
+
+  const secondRow = [];
+  for (let index = 6; index <= 10; index += 1) {
+    let buttonId = `ticketedit_slot:${index}`;
+    if (channelId) buttonId += `:${channelId}`;
+    secondRow.push(
+      new ButtonBuilder()
+        .setCustomId(buttonId)
+        .setLabel(`Slot ${index}`)
+        .setStyle(selectedSlot === index ? ButtonStyle.Success : ButtonStyle.Primary)
+    );
+  }
+
+  let previewId = 'ticketedit_preview';
+  let sendId = 'ticketedit_send';
+  let clearId = 'ticketedit_clear';
+  if (channelId) {
+    previewId += `:${channelId}`;
+    sendId += `:${channelId}`;
+    clearId += `:${channelId}`;
+  }
+
+  const previewButton = new ButtonBuilder()
+    .setCustomId(previewId)
+    .setLabel('Preview Embeds')
+    .setStyle(ButtonStyle.Secondary);
+
+  const sendButton = new ButtonBuilder()
+    .setCustomId(sendId)
+    .setLabel('Send to Panel')
+    .setStyle(ButtonStyle.Success);
+
+  const clearButton = new ButtonBuilder()
+    .setCustomId(clearId)
+    .setLabel('Clear Embeds')
+    .setStyle(ButtonStyle.Danger);
+
+  const thirdRow = new ActionRowBuilder().addComponents(previewButton, sendButton, clearButton);
+
+  return [new ActionRowBuilder().addComponents(...firstRow), new ActionRowBuilder().addComponents(...secondRow), thirdRow];
 }
 
 function buildTicketChannelEmbed(config) {
@@ -55,29 +123,6 @@ function buildTicketChannelEmbed(config) {
   return embed;
 }
 
-async function publishTicketPanel(channel, config) {
-  const embed = buildTicketPanelEmbed(config);
-  const button = new ButtonBuilder()
-    .setCustomId('ticket_open')
-    .setLabel(config.panelButtonLabel || 'Open Ticket')
-    .setStyle(ButtonStyle[config.panelButtonStyle] || ButtonStyle.Primary);
-
-  const row = new ActionRowBuilder().addComponents(button);
-  let message = null;
-
-  if (config.messageId) {
-    message = await channel.messages.fetch(config.messageId).catch(() => null);
-  }
-
-  if (message) {
-    await message.edit({ embeds: [embed], components: [row] }).catch(() => null);
-  } else {
-    message = await channel.send({ embeds: [embed], components: [row] });
-  }
-
-  return message?.id || null;
-}
-
 function buildTicketChannelName(user) {
   const baseName = user.username
     .toLowerCase()
@@ -85,6 +130,35 @@ function buildTicketChannelName(user) {
     .replace(/^-+|-+$/g, '')
     .slice(0, 12) || 'ticket';
   return `ticket-${baseName}-${user.id.slice(-4)}`;
+}
+
+async function clearTicketPanelsInChannel(channel) {
+  if (!channel || !channel.isTextBased()) return 0;
+
+  let deleted = 0;
+  let lastMessageId = null;
+  let page = 0;
+
+  while (page < 20) {
+    const options = { limit: 100 };
+    if (lastMessageId) options.before = lastMessageId;
+
+    const fetched = await channel.messages.fetch(options).catch(() => null);
+    if (!fetched || fetched.size === 0) break;
+
+    for (const msg of fetched.values()) {
+      if (!msg.author?.bot) continue;
+
+      await msg.delete().catch(() => null);
+      deleted += 1;
+    }
+
+    if (fetched.size < 100) break;
+    lastMessageId = fetched.last().id;
+    page += 1;
+  }
+
+  return deleted;
 }
 
 export default {
@@ -137,14 +211,20 @@ export default {
     )
     .addSubcommand((subcommand) =>
       subcommand
+        .setName('editembeds')
+        .setDescription('Edit ticket panel embeds (1-10 slots)')
+        .addChannelOption((option) =>
+          option
+            .setName('channel')
+            .setDescription('Channel where the ticket panel will be displayed')
+            .addChannelTypes(ChannelType.GuildText)
+            .setRequired(true)
+        )
+    )
+    .addSubcommand((subcommand) =>
+      subcommand
         .setName('editpanel')
-        .setDescription('Edit the ticket panel message content')
-        .addStringOption((option) =>
-          option.setName('title').setDescription('Panel embed title').setRequired(false)
-        )
-        .addStringOption((option) =>
-          option.setName('description').setDescription('Panel embed description').setRequired(false)
-        )
+        .setDescription('Edit the ticket open button settings')
         .addStringOption((option) =>
           option.setName('button_label').setDescription('Ticket button label').setRequired(false)
         )
@@ -159,39 +239,6 @@ export default {
               { name: 'Danger', value: 'Danger' }
             )
             .setRequired(false)
-        )
-        .addStringOption((option) =>
-          option.setName('footer').setDescription('Panel embed footer text').setRequired(false)
-        )
-        .addStringOption((option) =>
-          option.setName('color').setDescription('Panel embed hex color like #5865f2').setRequired(false)
-        )
-        .addStringOption((option) =>
-          option.setName('panel_field1_name').setDescription('Panel field 1 name').setRequired(false)
-        )
-        .addStringOption((option) =>
-          option.setName('panel_field1_value').setDescription('Panel field 1 value').setRequired(false)
-        )
-        .addBooleanOption((option) =>
-          option.setName('panel_field1_inline').setDescription('Panel field 1 inline?').setRequired(false)
-        )
-        .addStringOption((option) =>
-          option.setName('panel_field2_name').setDescription('Panel field 2 name').setRequired(false)
-        )
-        .addStringOption((option) =>
-          option.setName('panel_field2_value').setDescription('Panel field 2 value').setRequired(false)
-        )
-        .addBooleanOption((option) =>
-          option.setName('panel_field2_inline').setDescription('Panel field 2 inline?').setRequired(false)
-        )
-        .addStringOption((option) =>
-          option.setName('panel_field3_name').setDescription('Panel field 3 name').setRequired(false)
-        )
-        .addStringOption((option) =>
-          option.setName('panel_field3_value').setDescription('Panel field 3 value').setRequired(false)
-        )
-        .addBooleanOption((option) =>
-          option.setName('panel_field3_inline').setDescription('Panel field 3 inline?').setRequired(false)
         )
     )
     .addSubcommand((subcommand) =>
@@ -245,6 +292,12 @@ export default {
       subcommand.setName('publish').setDescription('Publish or update the ticket panel message')
     )
     .addSubcommand((subcommand) =>
+      subcommand.setName('clearpanels').setDescription('Delete every active ticket panel message in the configured channel')
+    )
+    .addSubcommand((subcommand) =>
+      subcommand.setName('resetembed').setDescription('Clear saved ticket embed data and start from a blank panel')
+    )
+    .addSubcommand((subcommand) =>
       subcommand.setName('status').setDescription('Show current ticket panel settings')
     ),
   requiredPermissions: PermissionFlagsBits.ManageChannels,
@@ -282,59 +335,36 @@ export default {
       return updated;
     }
 
-    if (subcommand === 'editpanel') {
-      const title = interaction.options.getString('title');
-      const description = interaction.options.getString('description');
-      const buttonLabel = interaction.options.getString('button_label');
-      const footer = interaction.options.getString('footer');
-      const colorInput = interaction.options.getString('color');
-
-      const panelColor = colorInput !== null ? parseHexColor(colorInput) : config.panelColor;
-      if (colorInput !== null && panelColor === null) {
-        await interaction.reply({ content: 'Panel color must be a 6-digit hex value like #5865f2.', ephemeral: true });
+    if (subcommand === 'editembeds') {
+      const channel = interaction.options.getChannel('channel');
+      if (!channel || channel.type !== ChannelType.GuildText) {
+        await interaction.reply({
+          content: 'Please choose a text channel.',
+          ephemeral: true
+        });
         return;
       }
 
-      const panelFields = [
-        {
-          name: interaction.options.getString('panel_field1_name'),
-          value: interaction.options.getString('panel_field1_value'),
-          inline: interaction.options.getBoolean('panel_field1_inline')
-        },
-        {
-          name: interaction.options.getString('panel_field2_name'),
-          value: interaction.options.getString('panel_field2_value'),
-          inline: interaction.options.getBoolean('panel_field2_inline')
-        },
-        {
-          name: interaction.options.getString('panel_field3_name'),
-          value: interaction.options.getString('panel_field3_value'),
-          inline: interaction.options.getBoolean('panel_field3_inline')
-        }
-      ].filter((field) => field.name && field.value);
+      setTicketConfig(guildId, { panelChannelId: channel.id });
 
+      await interaction.reply({
+        content: `Choose a slot to edit embeds for ${channel}. Click a slot to open the editor.`,
+        components: buildSlotPickerComponents(null, channel.id),
+        ephemeral: true
+      });
+      return;
+    }
+
+    if (subcommand === 'editpanel') {
+      const buttonLabel = interaction.options.getString('button_label');
       const buttonStyle = interaction.options.getString('button_style');
-      const updatedConfig = setTicketConfig(guildId, {
-        panelTitle: title ?? config.panelTitle,
-        panelDescription: description ?? config.panelDescription,
+
+      setTicketConfig(guildId, {
         panelButtonLabel: buttonLabel ?? config.panelButtonLabel,
-        panelButtonStyle: buttonStyle ?? config.panelButtonStyle,
-        panelFooter: footer ?? config.panelFooter,
-        panelColor,
-        panelFields: panelFields.length ? panelFields : config.panelFields
+        panelButtonStyle: buttonStyle ?? config.panelButtonStyle
       });
 
-      if (updatedConfig.panelChannelId) {
-        const channel = await interaction.guild.channels.fetch(updatedConfig.panelChannelId).catch(() => null);
-        if (channel && channel.type === ChannelType.GuildText) {
-          const messageId = await publishTicketPanel(channel, updatedConfig);
-          if (messageId) {
-            setTicketConfig(guildId, { messageId });
-          }
-        }
-      }
-
-      await interaction.reply({ content: 'Ticket panel configuration updated.', ephemeral: true });
+      await interaction.reply({ content: 'Ticket button settings updated.', ephemeral: true });
       return;
     }
 
@@ -383,13 +413,15 @@ export default {
     }
 
     if (subcommand === 'publish') {
+      await interaction.deferReply({ ephemeral: true });
+      
       if (!config.panelChannelId) {
-        await interaction.reply({ content: 'Set the ticket panel channel first with /ticket setpanel.', ephemeral: true });
+        await interaction.editReply({ content: 'Set the ticket panel channel first with /ticket editembeds.' });
         return;
       }
       const channel = interaction.guild.channels.cache.get(config.panelChannelId);
       if (!channel || channel.type !== ChannelType.GuildText) {
-        await interaction.reply({ content: 'The configured ticket panel channel is invalid. Set it again.', ephemeral: true });
+        await interaction.editReply({ content: 'The configured ticket panel channel is invalid. Set it again.' });
         return;
       }
 
@@ -397,7 +429,84 @@ export default {
       if (messageId) {
         setTicketConfig(guildId, { messageId });
       }
-      await interaction.reply({ content: `Ticket panel published in ${channel}.`, ephemeral: true });
+      await interaction.editReply({ content: `Ticket panel published in ${channel}.` });
+      return;
+    }
+
+    if (subcommand === 'clearpanels') {
+      await interaction.deferReply({ ephemeral: true });
+
+      if (!config.panelChannelId) {
+        await interaction.editReply({ content: 'No ticket panel channel is configured yet.' });
+        return;
+      }
+
+      const channel = interaction.guild.channels.cache.get(config.panelChannelId) || await interaction.guild.channels.fetch(config.panelChannelId).catch(() => null);
+      if (!channel || channel.type !== ChannelType.GuildText) {
+        await interaction.editReply({ content: 'The configured ticket panel channel is invalid or no longer available.' });
+        return;
+      }
+
+      const deleted = await clearTicketPanelsInChannel(channel);
+      setTicketConfig(guildId, {
+        messageId: null,
+        panelChannelId: channel.id,
+        panelEmbeds: [],
+        openTickets: {},
+        panelTitle: null,
+        panelDescription: null,
+        panelButtonLabel: null,
+        panelButtonStyle: null,
+        panelFooter: null,
+        panelColor: null,
+        panelFields: [],
+        ticketTitle: null,
+        ticketDescription: null,
+        ticketFooter: null,
+        ticketColor: null,
+        ticketFields: [],
+        ticketImageUrl: null
+      });
+      await interaction.editReply({ content: `Removed ${deleted} bot message(s) from ${channel}. The saved ticket state has been cleared. You can publish a fresh panel afterward.` });
+      return;
+    }
+
+    if (subcommand === 'resetembed') {
+      await interaction.deferReply({ ephemeral: true });
+
+      const blankState = {
+        messageId: null,
+        panelChannelId: config.panelChannelId || null,
+        categoryId: config.categoryId || null,
+        staffRoleId: config.staffRoleId || null,
+        transcriptChannelId: config.transcriptChannelId || null,
+        openTickets: {},
+        panelTitle: null,
+        panelDescription: null,
+        panelButtonLabel: null,
+        panelButtonStyle: null,
+        panelFooter: null,
+        panelColor: null,
+        panelFields: [],
+        panelEmbeds: [],
+        ticketTitle: null,
+        ticketDescription: null,
+        ticketFooter: null,
+        ticketColor: null,
+        ticketFields: [],
+        ticketImageUrl: null
+      };
+
+      setTicketConfig(guildId, blankState);
+
+      if (config.panelChannelId) {
+        const channel = interaction.guild.channels.cache.get(config.panelChannelId) || await interaction.guild.channels.fetch(config.panelChannelId).catch(() => null);
+        if (channel && channel.isTextBased()) {
+          await clearTicketPanelsInChannel(channel);
+        }
+      }
+
+      await interaction.editReply({ content: 'Ticket embed state has been reset to blank. Publish a fresh panel to start from a clean state.' });
       return;
     }
 
@@ -407,12 +516,8 @@ export default {
       lines.push(`Ticket category: ${config.categoryId ? `<#${config.categoryId}>` : 'Not set'}`);
       lines.push(`Staff role: ${config.staffRoleId ? `<@&${config.staffRoleId}>` : 'Not set'}`);
       lines.push(`Panel message ID: ${config.messageId || 'Not set'}`);
-      lines.push(`Panel title: ${config.panelTitle || 'Default'}`);
-      lines.push(`Panel description: ${config.panelDescription || 'Default'}`);
       lines.push(`Panel button label: ${config.panelButtonLabel || 'Open Ticket'}`);
-      lines.push(`Panel button style: ${config.panelButtonStyle || 'Primary'}`);
-      lines.push(`Panel color: ${config.panelColor ? `#${config.panelColor.toString(16).padStart(6, '0')}` : 'Default'}`);
-      lines.push(`Panel fields: ${config.panelFields?.length ? config.panelFields.map((f) => f.name).join(', ') : 'None'}`);
+      lines.push(`Panel button style: ${config.panelButtonStyle || 'Success'}`);
       lines.push(`Ticket title: ${config.ticketTitle || 'Default'}`);
       lines.push(`Ticket description: ${config.ticketDescription || 'Default'}`);
       lines.push(`Ticket color: ${config.ticketColor ? `#${config.ticketColor.toString(16).padStart(6, '0')}` : 'Default'}`);
@@ -421,6 +526,8 @@ export default {
       const openCount = config.openTickets ? Object.keys(config.openTickets).length : 0;
       lines.push(`Open tickets: ${openCount}`);
       lines.push(`Transcript channel: ${config.transcriptChannelId ? `<#${config.transcriptChannelId}>` : 'Not set'}`);
+      const embedCount = config.panelEmbeds?.filter((e) => hasEmbedContent(e)).length || 0;
+      lines.push(`Configured embeds: ${embedCount}/10`);
       await interaction.reply({ content: lines.join('\n'), ephemeral: true });
       return;
     }

@@ -2,25 +2,36 @@ import { ChannelType } from 'discord.js';
 import { getGuildConfig } from '../utils/settings.js';
 import { buildWelcomeEmbeds } from '../utils/welcomeEmbed.js';
 
+const recentWelcomeJoins = new Map();
+
 export default {
   name: 'guildMemberAdd',
   async execute(member) {
+    const now = Date.now();
+    const lastJoinAt = recentWelcomeJoins.get(member.id);
+
+    if (lastJoinAt && now - lastJoinAt < 15000) {
+      return;
+    }
+
+    recentWelcomeJoins.set(member.id, now);
+    setTimeout(() => recentWelcomeJoins.delete(member.id), 20000);
+
     const config = getGuildConfig(member.guild.id);
+    if (!config.welcomeChannelId) {
+      return;
+    }
+
     let welcomeChannel = null;
 
-    if (config.welcomeChannelId) {
-      try {
-        welcomeChannel = await member.guild.channels.fetch(config.welcomeChannelId);
-      } catch (error) {
-        welcomeChannel = null;
-      }
+    try {
+      welcomeChannel = await member.guild.channels.fetch(config.welcomeChannelId);
+    } catch (error) {
+      welcomeChannel = null;
     }
 
     if (!welcomeChannel || welcomeChannel.type !== ChannelType.GuildText) {
-      welcomeChannel =
-        member.guild.channels.cache.find(
-          (channel) => channel.name === 'welcome' && channel.type === ChannelType.GuildText
-        ) || member.guild.systemChannel;
+      return;
     }
 
     const embeds = buildWelcomeEmbeds(member.guild, member.user, config);

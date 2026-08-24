@@ -1,0 +1,84 @@
+{
+  "1507436010118709470": {
+    "ticket": {
+      "panelChannelId": "1508438785719799879",
+      "messageId": "1538680317093875754",
+      "categoryId": "1507759505687974048",
+      "staffRoleId": "1507805275309080628",
+      "transcriptChannelId": "1508431085778894918",
+      "openTickets": {
+        "1275145371496091728": "1528026751488495866",
+        "958071805292191865": "1528026921378644098"
+      },
+      "panelTitle": null,
+      "panelDescription": null,
+      "panelButtonLabel": "Open Ticket",
+      "panelButtonStyle": "Success",
+      "panelFooter": null,
+      "panelColor": null,
+      "panelFields": [],
+      "panelEmbeds": [
+        {
+          "title": "F&T Support Tickets",
+          "description": "Welcome to F&T Tickets. Please make sure you read the information displayed above before contacting staff. Once you have done please press the button below.",
+          "color": 7419530,
+          "image_url": null
+        }
+      ],
+      "ticketTitle": "F&T Support Tickets 🌙",
+      "ticketDescription": "You've opened a support ticket. Please tell us what brings you into the shadows and give us as much detail as possible so our staff can help. Whether something is broken, you have a question, or you've encountered an issue within the server, we'll be here to help.",
+      "ticketFooter": "Todd has carried your request into the darkness. Someone will answer soon.",
+      "ticketColor": 7419530,
+      "ticketFields": [],
+      "ticketImageUrl": "https://media.discordapp.net/attachments/1508064104202633237/1538681468170010644/content.png?ex=6a839049&is=6a823ec9&hm=d5cb71c3560ac2228bf3e9ea0b8edc1460a61fc3844e03dff82ba781a96a0865&=&format=webp&quality=lossless&width=640&height=320"
+    },
+    "pendingEmbeds": {},
+    "serverGuide": {
+      "title": "**F&T Server Guide ⚰️**",
+      "description": "Welcome to F&T here is a quick server guide to help you know where you want to go:",
+      "footer": "You're offically part of the family now! 🔮",
+      "color": "#71368a",
+      "fields": [
+        {
+          "name": "Welcome 🌙",
+          "value": "This is where you will find welcoming messages for new members who have just joined the server, learn about the rules that you need to follow and announcements within the discord server.",
+          "inline": false
+        },
+        {
+          "name": "Twitch Area 📺",
+          "value": "The twitch area is the main catergory within the server, this is where you will find, stream notifications when F&T are live on twitch, you will be able to link your twitch account as well to get perks within discord please make sure you read the embed in <#1507762669359464649>⁠⁠ as not everyone is eliagble for the perks, you will be able to post clips that you have got from F&T's stream, and you will be able to discover more about Todd the F&T's mascot and helper.",
+          "inline": false
+        },
+        {
+          "name": "Cozy & Chill ⚰️",
+          "value": "This catergory is for venting, late night photography/chats, telling storys and telling people about your dreams/plans for the future.",
+          "inline": false
+        },
+        {
+          "name": "Community Forest 💜",
+          "value": "This is an area full of fun things ranging from general chat, memes channel (where todd posts everyday at 3am GMT), music channels, arts and crafts, pet pictures etc",
+          "inline": false
+        },
+        {
+          "name": "Voice Channels 🪶",
+          "value": "This is where you will find a variety of voice channels that lost souls can hop in at any time to game, chat, watch streams etc",
+          "inline": false
+        }
+      ]
+    },
+    "welcomeChannelId": null,
+    "sendDM": false,
+    "welcomeEmbeds": [],
+    "twitchStreamer": "fog_thorn",
+    "twitchNotifyChannelId": "1507764046638874635",
+    "title": null,
+    "description": null,
+    "color": null,
+    "imageUrl": null,
+    "thumbnailUrl": null,
+    "footer": null,
+    "footerIconUrl": null,
+    "authorName": null,
+    "authorIconUrl": null
+  }
+}
