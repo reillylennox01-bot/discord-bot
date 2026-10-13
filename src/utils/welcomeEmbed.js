@@ -35,13 +35,12 @@ export function buildWelcomeEmbed(guild, user, config) {
     .setDescription(
       config.description || `Hello ${user}, welcome to **${guild.name}**! We're happy to have you here.`
     )
-    .setThumbnail(thumbnailUrl || user.displayAvatarURL({ extension: 'png', size: 512 }))
-    .addFields(
-      { name: 'Member Count', value: `${guild.memberCount}`, inline: true },
-      { name: 'Get Started', value: 'Read the rules and say hello in chat!', inline: true }
-    )
     .setFooter({ text: config.footer || 'Welcome message', iconURL: footerIconUrl ?? undefined })
     .setTimestamp();
+
+  if (thumbnailUrl) {
+    embed.setThumbnail(thumbnailUrl);
+  }
 
   if (imageUrl) {
     embed.setImage(imageUrl);
