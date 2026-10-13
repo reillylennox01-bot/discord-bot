@@ -35,6 +35,9 @@ export default {
     }
 
     const embeds = buildWelcomeEmbeds(member.guild, member.user, config);
+    if (embeds.length === 0) {
+      return;
+    }
 
     if (welcomeChannel && welcomeChannel.type === ChannelType.GuildText) {
       await welcomeChannel.send({

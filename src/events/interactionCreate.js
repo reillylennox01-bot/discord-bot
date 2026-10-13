@@ -23,7 +23,7 @@ import {
   ChannelType,
   Collection
 } from 'discord.js';
-import { buildWelcomeEmbed, buildWelcomeEmbeds } from '../utils/welcomeEmbed.js';
+import { buildWelcomeEmbed, buildWelcomeEmbeds, hasWelcomeEmbedContent } from '../utils/welcomeEmbed.js';
 
 function parseColor(value) {
   if (!value) return null;
@@ -1890,18 +1890,14 @@ export default {
           thumbnail_url: thumbnailUrl
         };
 
-        const hasContent = Boolean(
-          updatedData.title ||
-            updatedData.description ||
-            updatedData.image_url ||
-            updatedData.thumbnail_url ||
-            updatedData.author_name ||
-            updatedData.footer
-        );
+        const hasContent = hasWelcomeEmbedContent(updatedData);
 
         welcomeEmbeds[slotIndex] = hasContent ? updatedData : null;
 
-        setGuildConfig(interaction.guild.id, { welcomeEmbeds });
+        setGuildConfig(interaction.guild.id, {
+          welcomeEmbeds,
+          ...(hasContent ? { welcomeEmbedCleared: false } : {})
+        });
 
         const advancedButton = new ButtonBuilder()
           .setCustomId(`editwelcome_advanced:${slot}`)
@@ -1952,7 +1948,10 @@ export default {
         existingData.fields = fields;
 
         welcomeEmbeds[slotIndex] = existingData;
-        setGuildConfig(interaction.guild.id, { welcomeEmbeds });
+        setGuildConfig(interaction.guild.id, {
+          welcomeEmbeds,
+          ...(hasWelcomeEmbedContent(existingData) ? { welcomeEmbedCleared: false } : {})
+        });
 
         await interaction.reply({
           content: `Advanced options for welcome slot ${slot} saved!`,

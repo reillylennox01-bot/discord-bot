@@ -27,11 +27,12 @@ export default {
       footerIconUrl: null,
       authorName: null,
       authorIconUrl: null,
-      welcomeEmbeds: []
+      welcomeEmbeds: [],
+      welcomeEmbedCleared: true
     });
 
     await interaction.editReply({
-      content: 'Welcome embed configuration cleared. The welcome channel and existing messages were left unchanged.'
+      content: 'Welcome embed cleared. The welcome channel and existing messages were left unchanged.'
     });
   }
 };

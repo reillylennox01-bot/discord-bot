@@ -54,7 +54,7 @@ export function buildWelcomeEmbed(guild, user, config) {
   return embed;
 }
 
-function hasWelcomeEmbedContent(data) {
+export function hasWelcomeEmbedContent(data) {
   return Boolean(
     data?.title ||
       data?.description ||
@@ -122,6 +122,10 @@ function buildWelcomeEmbedFromSlot(guild, user, data) {
 }
 
 export function buildWelcomeEmbeds(guild, user, config) {
+  if (config?.welcomeEmbedCleared) {
+    return [];
+  }
+
   const firstSlotEmbed = Array.isArray(config.welcomeEmbeds)
     ? config.welcomeEmbeds.find((data) => hasWelcomeEmbedContent(data))
     : null;

@@ -37,7 +37,9 @@ export default {
 
       await interaction.editReply({
         embeds,
-        content: 'Here is how the welcome message will look:'
+        content: embeds.length > 0
+          ? 'Here is how the welcome message will look:'
+          : 'The welcome embed is cleared. Configure a new one with /editwelcome or /setwelcome.'
       });
     } catch (error) {
       console.error('Error in testwelcome command:', error);

@@ -91,6 +91,17 @@ export default {
     const authorIconUrl = interaction.options.getString('author_icon_url');
     const sendDM = interaction.options.getBoolean('send_dm');
     const shouldPreview = interaction.options.getBoolean('preview') ?? false;
+    const hasEmbedUpdates = [
+      title,
+      description,
+      color,
+      imageUrl,
+      thumbnailUrl,
+      footer,
+      footerIconUrl,
+      authorName,
+      authorIconUrl
+    ].some(Boolean);
 
     if (channel) config.welcomeChannelId = channel.id;
     if (title) config.title = title;
@@ -126,7 +137,8 @@ export default {
     if (Object.keys(config).length > 0) {
       setGuildConfig(guildId, {
         ...config,
-        welcomeEmbeds: []
+        welcomeEmbeds: [],
+        ...(hasEmbedUpdates ? { welcomeEmbedCleared: false } : {})
       });
     }
 
