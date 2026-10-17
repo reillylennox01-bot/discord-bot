@@ -1,5 +1,6 @@
-import { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder, MessageFlags } from 'discord.js';
+import { SlashCommandBuilder, EmbedBuilder, MessageFlags } from 'discord.js';
 import { getModerationHistory } from '../utils/modLogs.js';
+import { hasWatchlistAccess } from '../utils/watchlistAccess.js';
 
 const HISTORY_PAGE_SIZE = 10;
 
@@ -26,21 +27,9 @@ export default {
   async execute(interaction) {
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
-    const spellcasterRole = interaction.guild.roles.cache.find(
-      (role) => role.name.toLowerCase() === 'spellcaster'
-    );
-    if (!spellcasterRole) {
-      await interaction.editReply({ content: 'The Spellcaster role could not be found in this server.' });
-      return;
-    }
-
     const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
-    const hasAccess = member && (
-      member.permissions.has(PermissionFlagsBits.Administrator) ||
-      member.roles.cache.some((role) => role.position >= spellcasterRole.position)
-    );
-    if (!hasAccess) {
-      await interaction.editReply({ content: 'You need the Spellcaster role or a higher role to view moderation history.' });
+    if (!hasWatchlistAccess(member)) {
+      await interaction.editReply({ content: 'You need an authorized watch-list staff role to view moderation history.' });
       return;
     }
 

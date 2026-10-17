@@ -22,8 +22,8 @@
 | Command | Description | Who Can Use | Delegatable |
 |---------|-------------|------------|------------|
 | `/moderation` | Manage guild members (kick, ban, timeout, etc.) | KickMembers, BanMembers, ModerateMembers, or ManageMessages | Yes |
-| `/modlog` | View a member's moderation history by user ID, paged through all recorded actions | Spellcaster role or higher | No |
-| `/watch` | Add a user ID and reason to the watch-list channel | Spellcaster role or higher | No |
+| `/modlog` | View a member's moderation history by user ID, paged through all recorded actions | Spellcaster, Raven Owner, Raven Guard, Forest Keeper, or Administrator | No |
+| `/watch` | Add a user ID and reason to the watch-list channel | Spellcaster, Raven Owner, Raven Guard, Forest Keeper, or Administrator | No |
 
 ### Ticket System
 
@@ -102,7 +102,7 @@ Members who can manage guild settings can use:
 Members with any of: **KickMembers**, **BanMembers**, **ModerateMembers**, or **ManageMessages** can use:
 - `/moderation` - Manage guild members (delegatable)
 
-Members with the **Spellcaster** role or a higher role can use:
+Members with the **Spellcaster**, **Raven Owner**, **Raven Guard**, or **Forest Keeper** role can use:
 - `/modlog` - View a member's recorded moderation history by user ID
 - `/watch` - Add a user ID and reason to the watch-list channel
 
