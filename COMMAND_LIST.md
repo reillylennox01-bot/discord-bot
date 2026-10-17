@@ -22,7 +22,8 @@
 | Command | Description | Who Can Use | Delegatable |
 |---------|-------------|------------|------------|
 | `/moderation` | Manage guild members (kick, ban, timeout, etc.) | KickMembers, BanMembers, ModerateMembers, or ManageMessages | Yes |
-| `/modlog` | View a member's moderation history | KickMembers, BanMembers, ModerateMembers, or ManageMessages | Yes |
+| `/modlog` | View a member's moderation history by user ID, paged through all recorded actions | Spellcaster role or higher | No |
+| `/watch` | Add a user ID and reason to the watch-list channel | Spellcaster role or higher | No |
 
 ### Ticket System
 
@@ -59,6 +60,7 @@
 | Command | Description | Who Can Use |
 |---------|-------------|------------|
 | `/setstreamer` | Set a Twitch streamer and notification channel for live alerts | All members |
+| `/setlivepingrole` | Set or clear the role mentioned in Twitch live alerts | All members |
 | `/twitchlink` | Manage Twitch account linking for subscriber role assignment | All members |
 | `/disabletwitch` | Disable Twitch live notifications for this server | All members |
 
@@ -99,7 +101,10 @@ Members who can manage guild settings can use:
 ### Moderation Permissions
 Members with any of: **KickMembers**, **BanMembers**, **ModerateMembers**, or **ManageMessages** can use:
 - `/moderation` - Manage guild members (delegatable)
-- `/modlog` - View member moderation history (delegatable)
+
+Members with the **Spellcaster** role or a higher role can use:
+- `/modlog` - View a member's recorded moderation history by user ID
+- `/watch` - Add a user ID and reason to the watch-list channel
 
 ### ManageChannels Permission
 Members who can manage channels can use:
@@ -123,6 +128,7 @@ Everyone can use:
 - `/editwelcome` - Edit welcome embeds
 - `/editserverguide` - Edit server guide
 - `/setstreamer` - Set Twitch streamer alerts
+- `/setlivepingrole` - Set or clear the role ping for Twitch live alerts
 - `/twitchlink` - Link Twitch account
 - `/disabletwitch` - Disable Twitch notifications
 - `/setspookymemes` - Configure spooky memes
@@ -144,7 +150,6 @@ These commands can be allowed/denied for regular members by guild managers:
 |---------|------------------|-------------------|
 | automod | ManageGuild | `/commandaccess allow automod` |
 | moderation | Moderation permissions | `/commandaccess allow moderation` |
-| modlog | Moderation permissions | `/commandaccess allow modlog` |
 | ticket | ManageChannels | `/commandaccess allow ticket` |
 | twitchsubrole | ManageRoles | `/commandaccess allow twitchsubrole` |
 

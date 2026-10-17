@@ -8,7 +8,8 @@ export default {
   async execute(interaction) {
     setGuildConfig(interaction.guild.id, {
       twitchStreamer: null,
-      twitchNotifyChannelId: null
+      twitchNotifyChannelId: null,
+      twitchNotifyRoleId: null
     });
 
     await interaction.reply({

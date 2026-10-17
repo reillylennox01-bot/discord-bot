@@ -286,7 +286,13 @@ async function checkGuild(client, guild) {
       const channel = await guild.channels.fetch(channelId).catch(() => null);
       if (channel && channel.type === ChannelType.GuildText) {
         const embed = buildLiveEmbed(stream);
-        await channel.send({ content: `🔴 **${stream.user_name} is now live on Twitch!**`, embeds: [embed] }).catch(() => null);
+        const pingRoleId = config.twitchNotifyRoleId;
+        const roleMention = pingRoleId ? `<@&${pingRoleId}> ` : '';
+        await channel.send({
+          content: `${roleMention}🔴 **${stream.user_name} is now live on Twitch!**`,
+          embeds: [embed],
+          allowedMentions: { roles: pingRoleId ? [pingRoleId] : [] }
+        }).catch(() => null);
       } else {
         console.warn(`Twitch notify channel invalid for guild ${guild.id}`);
       }
